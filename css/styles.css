@@ -435,9 +435,21 @@ html.dark {
 
 html,body {
   height:100%;
+  height:100dvh; /* keep in lockstep with #app below so a percentage/dvh
+    mismatch between parent and child can never leave body's box shorter
+    than #app's and clip it under this rule's own overflow:hidden */
   overflow:hidden;
   font-family:'Roboto Flex', sans-serif;
-  background:var(--off-white);
+  /* Was var(--off-white), which is a *different* color from #app's own
+     background (var(--md-sys-color-background)) — F8F6F2 vs FAFAFA in
+     light mode, 1A1A1A vs 121212 in dark. Viewport-unit heights round to
+     the nearest device pixel, so #app can legitimately fall a sub-pixel
+     short of the true screen edge; that's normally invisible, but here it
+     let body's *differently colored* background show through as a thin
+     line at every edge — read as "the app doesn't reach the edge".
+     Matching the color exactly means even an unavoidable rounding gap
+     blends in instead of showing a seam. */
+  background:var(--md-sys-color-background);
   color:var(--text-dark);
   -webkit-font-smoothing:antialiased;
   touch-action: pan-x pan-y;
