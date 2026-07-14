@@ -3927,6 +3927,15 @@ input#priceRangeInput::-moz-range-thumb {
   margin-bottom: 16px;
 }
 
+/* Centered, smaller title variant for headers with a Back + Close button
+   flanking it (e.g. the Local Price edit sheet) — the two 48px icon-btns
+   are equal width, so flex:1 + text-align:center lands it dead-center. */
+.modal-title-centered {
+  flex: 1;
+  text-align: center;
+  font-size: var(--md-sys-typescale-title-medium-size);
+}
+
 /* Phase 8: M3 Body Medium */
 .modal-sub {
   font-family: var(--md-sys-typescale-body-medium-font);
@@ -3988,6 +3997,488 @@ input#priceRangeInput::-moz-range-thumb {
   resize: vertical;
   min-height: 88px;
   line-height: var(--md-sys-typescale-body-large-line-height);
+}
+
+/* ── EDIT-FORM CAROUSEL ──
+   Generic multi-step bottom-sheet form: a top progress bar, a swipeable
+   track of .fc-slide panels, and a Back/Next-or-Submit nav row. Driven by
+   initFormCarousel()/goToFormSlide()/nextFormSlide()/prevFormSlide() in
+   utils.js — pass a unique prefix (e.g. 'editLP', 'editDeal') and it wires
+   up #<prefix>Progress, #<prefix>CarouselWrap/Track and
+   #<prefix>Back/Next/SubmitBtn by id. Used by the Local Price and Deal
+   edit sheets (deals.js) so long forms read as a few short steps instead
+   of one long scroll. */
+.fc-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.fc-progress-seg {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--md-sys-color-outline-variant);
+  overflow: hidden;
+}
+
+.fc-progress-seg-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: #2E7D32; /* matches .fc-next-btn */
+  border-radius: 999px;
+  transition: width 0.3s var(--md-sys-motion-easing-emphasized);
+}
+
+.fc-progress-seg.filled .fc-progress-seg-fill { width: 100%; }
+
+/* Full-bleed within the modal sheet: cancel .modal-sheet's 24px side
+   padding with matching negative margins (same trick as .launch-carousel-wrap). */
+.fc-carousel-wrap {
+  overflow: hidden;
+  margin: 0 -24px;
+  touch-action: pan-y;
+}
+
+.fc-carousel-track {
+  display: flex;
+  align-items: flex-start;
+  transition: transform var(--md-sys-motion-duration-medium3) var(--md-sys-motion-easing-emphasized);
+  will-change: transform;
+}
+
+.fc-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.fc-slide-title {
+  font-family: var(--md-sys-typescale-title-medium-font);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 4px;
+}
+
+/* Grouped white "category" cards — Local Price edit sheet, slide 1.
+   Sits on the modal's light-gray surface-container-low background so
+   each card (Business name / Location / Opening & closing time) reads
+   as its own boxed section, same grouping pattern as the reference. */
+.fc-field-card {
+  background: var(--md-sys-color-surface);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.fc-field-card-label {
+  font-family: var(--md-sys-typescale-body-small-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 6px;
+}
+
+.fc-slide-desc {
+  font-family: var(--md-sys-typescale-body-small-font);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 18px;
+}
+
+.fc-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Shared slot — Next and Submit-for-review both occupy this exact grid
+   cell, so swapping which one is visible on the last slide never shifts
+   layout and can cross-fade instead of snapping (same trick as
+   .launch-actions-slot). */
+.fc-btn-slot {
+  display: grid;
+}
+
+.fc-btn-slot > * {
+  grid-area: 1 / 1;
+  justify-self: end;
+}
+
+.fc-btn-slot .fc-next-btn {
+  transition: opacity 0.35s ease, visibility 0s linear 0s;
+}
+
+.fc-btn-slot .fc-btn-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.35s ease, visibility 0s linear 0.35s;
+}
+
+/* "Change location" collapsible — sits under the business name on the
+   first slide of the Local Price edit sheet; expands to reveal the
+   address search + minimap without needing its own carousel step. */
+.fc-location-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fc-location-toggle i {
+  font-size: 20px;
+  transition: transform 0.25s var(--md-sys-motion-easing-emphasized);
+}
+
+.fc-location-toggle.open i {
+  transform: rotate(180deg);
+}
+
+.fc-location-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s var(--md-sys-motion-easing-emphasized);
+}
+
+.fc-location-panel.open {
+  max-height: 320px;
+}
+
+/* Hours card's collapsible panel — reuses .fc-location-toggle for the
+   chevron button, but needs more room since "Different per day" mode
+   renders 7 rows. */
+.fc-hours-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s var(--md-sys-motion-easing-emphasized);
+}
+
+.fc-hours-panel.open {
+  max-height: 560px;
+}
+
+.fc-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: 0 0 auto;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface);
+  font-size: 20px;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 1;
+  transition: opacity 0.3s ease, visibility 0s linear 0s;
+}
+
+/* Kept in the layout (not display:none) so the Next/Submit button never
+   shifts position when Back disappears on the first slide. Fades out over
+   0.3s, and only becomes visibility:hidden (non-interactive) once that
+   fade has finished — so it reads as a fade rather than a snap. */
+.fc-back-btn.fc-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.fc-next-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  flex: 0 0 auto;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: #2E7D32;
+  border: none;
+  cursor: pointer;
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  color: #FFFFFF;
+  box-shadow: var(--md-sys-elevation-shadow-1);
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Edit Local Price modal — text fields (name, items, discount value,
+   discount description, address search) share the same 28px corner
+   radius as the menu-row cards above. */
+#editLocalPriceModal input.form-input,
+#editLocalPriceModal .form-textarea,
+#editLocalPriceModal .picker-search-input {
+  border-radius: 28px;
+}
+#editLocalPriceModal input.form-input:focus,
+#editLocalPriceModal .form-textarea:focus {
+  border-radius: 28px;
+}
+#editLocalPriceModal .picker-search-input:focus {
+  border-radius: 28px;
+}
+
+/* Business name field — same rounded shape as other fields, but no
+   filled background. */
+#editLPName {
+  background: transparent;
+}
+
+/* Opening/closing time dropdown row — slide 1 of both edit sheets. */
+.fc-hours-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fc-hours-select {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23767872' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 38px;
+  cursor: pointer;
+}
+
+/* Writable time field for the per-day hours rows — a plain typable input
+   (native time picker), not a dropdown list like .fc-hours-select above. */
+.fc-hours-time {
+  flex: 1;
+  min-width: 0;
+}
+
+.fc-hours-sep {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Per-day opening hours rows (Local Price edit sheet — "Different per
+   day" mode). Each row: day label, a "Closed" checkbox, and the same
+   dropdown pair used by the uniform-hours row above. */
+.fc-perday-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.fc-perday-label {
+  flex: 0 0 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+.fc-perday-closed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-light);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fc-perday-closed-toggle input { margin: 0; }
+.fc-perday-hours-row { flex: 1; min-width: 0; }
+.fc-perday-row.is-closed .fc-perday-hours-row { visibility: hidden; }
+
+/* Left slot of the nav row — Back arrow (slides 2+) cross-fades with a
+   Delete button (slide 1 only), same overlay/grid trick as .fc-btn-slot
+   uses for Next/Submit, so the swap never shifts the row's height. */
+.fc-left-slot {
+  display: grid;
+}
+
+.fc-left-slot > * {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+
+.fc-left-slot .fc-back-btn {
+  transition: opacity 0.3s ease, visibility 0s linear 0s;
+}
+
+.fc-left-slot .fc-back-btn.fc-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.fc-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  letter-spacing: var(--md-sys-typescale-label-large-tracking);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.35s ease, visibility 0s linear 0s;
+}
+
+.fc-delete-btn i { font-size: 18px; }
+
+.fc-delete-btn.fc-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.35s ease, visibility 0s linear 0.35s;
+}
+
+/* Round, icon-only "add item" button (Items & Prices step) — right-aligned
+   instead of the full-width dashed bar used elsewhere. */
+.add-price-btn-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.add-price-btn-round {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2E7D32;
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--md-sys-elevation-shadow-1);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
+}
+
+.add-price-btn-round:active {
+  transform: scale(0.92);
+}
+
+.add-price-btn-round i { font-size: 22px; }
+
+/* ── EDIT-SHEET MENU (hub) ──
+   Slide 0 of the Local Price / Deal edit sheet: a Settings-app-style
+   grouped list. Each .fc-menu-group is a rounded white card; rows inside
+   share a top-to-bottom divider that starts after the icon (like iOS
+   Settings). Tapping a row jumps straight to that section's slide via
+   goToEditLPSection() in deals.js. */
+.fc-menu-group {
+  background: var(--md-sys-color-surface);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+/* Edit Local Price modal: menu-row cards get a more rounded corner. */
+#editLocalPriceModal .fc-menu-group {
+  border-radius: 28px;
+}
+
+.fc-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fc-menu-row:active {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.fc-menu-row:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 56px;
+  right: 14px;
+  bottom: 0;
+  height: 1px;
+  background: var(--border);
+}
+
+.fc-menu-icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--off-white);
+  color: var(--text-mid);
+}
+
+.fc-menu-icon i { font-size: 18px; }
+
+.fc-menu-label {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Roboto Flex', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-menu-value {
+  flex: 0 1 auto;
+  font-size: 13.5px;
+  color: var(--text-light);
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-menu-chevron {
+  flex: 0 0 auto;
+  font-size: 19px;
+  color: var(--text-light);
 }
 
 .type-grid {
@@ -4650,9 +5141,21 @@ input#priceRangeInput::-moz-range-thumb {
 
 .price-row {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 1fr 20px;
   gap: 8px;
   margin-bottom: 10px;
+  align-items: center;
+}
+
+.price-row-check {
+  font-size: 18px;
+  color: transparent;
+  justify-self: center;
+  transition: color 0.15s;
+}
+
+.price-row.price-row-valid .price-row-check {
+  color: #2E7D32;
 }
 
 .add-price-btn {
@@ -6890,6 +7393,41 @@ html.dark .type-option.locked {
   white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25);
   min-width:28px;text-align:center;transition:background 0.3s;
 }
+/* Grayscale a pin's emoji when the venue has no structured opening-hours
+   data at all (pinDisabled in renderDealMarkers(), deals.js) — emoji
+   glyphs are drawn by the system font in full color and ignore text
+   `color`, so this needs an actual pixel filter to read as "disabled". */
+.map-pin.pin-disabled .map-pin-emoji { filter:grayscale(1) contrast(0.75); opacity:0.9; }
+/* Small dot shown instead of a full pin for a venue with structured hours
+   that's closed right now (pinDot in renderDealMarkers(), deals.js) —
+   still a real marker, just minimized so open venues stand out. */
+.map-pin-dot {
+  width:12px;height:12px;border-radius:50%;
+  background:var(--md-sys-color-on-surface-variant);
+  border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.25);
+}
+/* "Happy hour ⚡ <time>" pill above a price pin — shown whenever a venue
+   has an active window right now (see makePricePin()/updatePinHHBadge()
+   in map.js). Same green as the popup card's own HH badge
+   (.popup-hh-timer) and the same collapse pattern: "Happy hour" slides
+   away 5s after the pin first renders, leaving just the compact
+   "⚡ <time>". */
+.map-hh-badge {
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;
+  background:#2E7D32;color:#FFFFFF;
+  font-family:'Roboto Flex', sans-serif;
+  font-size:9.5px;font-weight:700;
+  padding:2px 6px;border-radius:var(--md-sys-shape-corner-full);
+  white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25);
+}
+.map-hh-badge-label {
+  display:inline-block;max-width:60px;overflow:hidden;opacity:1;
+  margin-right:3px;
+  transition:max-width 0.4s ease, opacity 0.3s ease, margin-right 0.4s ease;
+}
+.map-hh-badge.collapsed .map-hh-badge-label { max-width:0;opacity:0;margin-right:0; }
+.map-hh-badge-time { white-space:nowrap; }
 .u-text-muted   { color:var(--text-light); }
 .detail-link    { color:var(--amber-dark); }
 
