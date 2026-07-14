@@ -465,79 +465,173 @@
       <div class="modal-sheet" style="max-height:96vh;overflow-y:auto;">
         <div class="modal-handle"></div>
         <div class="u-modal-header">
-          <div class="modal-title" style="margin-bottom:0">Suggest an edit</div>
-          <button class="icon-btn" onclick="closeEditLocalPrice()"><i class="material-symbols-outlined">close</i></button>
+          <button class="icon-btn" onclick="handleEditLPBack(closeEditLocalPrice)" aria-label="Back"><i class="material-symbols-outlined">arrow_back</i></button>
+          <div class="modal-title modal-title-centered" id="editLPModalTitle" style="margin-bottom:0">Edit</div>
+          <button class="icon-btn" onclick="closeEditLocalPrice()" aria-label="Close"><i class="material-symbols-outlined">close</i></button>
         </div>
-        <p class="modal-sub">Your changes will be reviewed before going live.</p>
         <input type="hidden" id="editLocalPriceKey">
+        <input type="hidden" id="editLPDealId">
         <input type="hidden" id="editLPLat">
         <input type="hidden" id="editLPLng">
 
-        <div class="form-group">
-          <label class="form-label">Business name</label>
-          <input type="text" class="form-input" id="editLPName" placeholder="e.g. Central Bar" maxlength="120">
-        </div>
+        <div class="fc-carousel-wrap" id="editLPCarouselWrap">
+          <div class="fc-carousel-track" id="editLPCarouselTrack">
 
-        <div class="form-group">
-          <label class="form-label">Address <span style="font-size:11px;color:var(--text-light);font-weight:400;">(optional — move pin to update)</span></label>
-          <div class="picker-search-wrap" style="margin-bottom:8px;">
-            <i class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light);font-size:16px;pointer-events:none;z-index:2;">search</i>
-            <input type="text" class="picker-search-input" id="editLPSearchInput" placeholder="Search address…"
-              oninput="onEditLPSearch(this.value)"
-              onfocus="if(this.value.trim().length>1)document.getElementById('editLPSearchResults').classList.add('open')"
-              autocomplete="off">
-            <button class="picker-search-clear" id="editLPSearchClear" onclick="clearEditLPSearch()"><i class="material-symbols-outlined">close</i></button>
-            <div class="picker-search-results" id="editLPSearchResults"></div>
+            <!-- Slide 0: MENU — Settings-style hub. Each row jumps straight
+                 to its own slide via goToEditLPSection(); the header Back
+                 button always returns here (see handleEditLPBack). -->
+            <div class="fc-slide">
+              <div class="fc-menu-group">
+                <button type="button" class="fc-menu-row" onclick="goToEditLPSection('name')">
+                  <span class="fc-menu-icon"><i class="material-symbols-outlined">badge</i></span>
+                  <span class="fc-menu-label">Name</span>
+                  <span class="fc-menu-value" id="editLPMenuValName"></span>
+                  <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
+                </button>
+                <button type="button" class="fc-menu-row" onclick="goToEditLPSection('location')">
+                  <span class="fc-menu-icon"><i class="material-symbols-outlined">location_on</i></span>
+                  <span class="fc-menu-label">Location</span>
+                  <span class="fc-menu-value" id="editLPMenuValLocation"></span>
+                  <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
+                </button>
+                <button type="button" class="fc-menu-row" onclick="goToEditLPSection('hours')">
+                  <span class="fc-menu-icon"><i class="material-symbols-outlined">schedule</i></span>
+                  <span class="fc-menu-label">Hours</span>
+                  <span class="fc-menu-value" id="editLPMenuValHours"></span>
+                  <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
+                </button>
+                <button type="button" class="fc-menu-row" onclick="goToEditLPSection('categories')">
+                  <span class="fc-menu-icon"><i class="material-symbols-outlined">category</i></span>
+                  <span class="fc-menu-label">Categories</span>
+                  <span class="fc-menu-value" id="editLPMenuValCat"></span>
+                  <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
+                </button>
+              </div>
+
+              <div class="fc-menu-group">
+                <button type="button" class="fc-menu-row" onclick="goToEditLPSection('items')">
+                  <span class="fc-menu-icon"><i class="material-symbols-outlined" id="editLPMenuIconItems">local_offer</i></span>
+                  <span class="fc-menu-label" id="editLPMenuLabelItems">Items &amp; Prices</span>
+                  <span class="fc-menu-value" id="editLPMenuValItems"></span>
+                  <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Slide 1: Name -->
+            <div class="fc-slide">
+              <div class="fc-field-card">
+                <div class="form-group" style="margin-bottom:0;">
+                  <input type="text" class="form-input" id="editLPName" placeholder="e.g. Central Bar" maxlength="120">
+                </div>
+              </div>
+            </div>
+
+            <!-- Slide 2: Location -->
+            <div class="fc-slide">
+              <div class="fc-field-card">
+                <div class="form-group" style="margin-top:2px;margin-bottom:0;">
+                  <div class="picker-search-wrap" style="margin-bottom:8px;">
+                    <i class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light);font-size:16px;pointer-events:none;z-index:2;">search</i>
+                    <input type="text" class="picker-search-input" id="editLPSearchInput" placeholder="Search address…"
+                      oninput="onEditLPSearch(this.value)"
+                      onfocus="if(this.value.trim().length>1)document.getElementById('editLPSearchResults').classList.add('open')"
+                      autocomplete="off">
+                    <button class="picker-search-clear" id="editLPSearchClear" onclick="clearEditLPSearch()"><i class="material-symbols-outlined">close</i></button>
+                    <div class="picker-search-results" id="editLPSearchResults"></div>
+                  </div>
+                  <div id="editLPMap" style="height:220px;border-radius:var(--radius-md);overflow:hidden;z-index:1;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slide 3: Hours -->
+            <div class="fc-slide">
+              <div class="fc-field-card">
+                <div class="ld-type-row" id="editLPHoursModeRow">
+                  <button type="button" class="ld-type-btn active" id="editLPHoursModeSame" onclick="setEditLPHoursMode('same')">Same every day</button>
+                  <button type="button" class="ld-type-btn" id="editLPHoursModeCustom" onclick="setEditLPHoursMode('custom')">Different per day</button>
+                </div>
+                <div class="fc-hours-row" id="editLPUniformHours">
+                  <select class="form-input fc-hours-select" id="editLPOpenTime"></select>
+                  <span class="fc-hours-sep">to</span>
+                  <select class="form-input fc-hours-select" id="editLPCloseTime"></select>
+                </div>
+                <div id="editLPPerDayHours" style="display:none;"></div>
+              </div>
+            </div>
+
+            <!-- Slide 4: Categories -->
+            <div class="fc-slide">
+              <div class="form-group">
+                <div class="type-grid">
+                  <button class="type-option" data-lpcat="bar" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sports_bar</i><span>Bar</span></button>
+                  <button class="type-option" data-lpcat="coffee shop" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">local_cafe</i><span>Café</span></button>
+                  <button class="type-option" data-lpcat="deal" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sell</i><span>Deal</span></button>
+                  <button class="type-option" data-lpcat="activity" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">directions_run</i><span>Activities</span></button>
+                  <button class="type-option" data-lpcat="hostel" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">bed</i><span>Hostel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slide 5: Items & Prices — swaps to a plain Discount form
+                 when the "Deal" category is selected (see
+                 refreshEditLPItemsOrDiscount() in deals.js). -->
+            <div class="fc-slide">
+              <div id="editLPItemsSection">
+                <div class="form-group">
+                  <div id="editLPRows"></div>
+                  <div class="add-price-btn-row">
+                    <button type="button" class="add-price-btn-round" onclick="addEditLPRow()" aria-label="Add item"><i class="material-symbols-outlined">add</i></button>
+                  </div>
+                </div>
+
+                <div class="fc-slide-title" style="margin-top:20px;">Happy Hour</div>
+                <div class="hh-block" style="margin-top:0;">
+                  <div id="editLPHHSlots"></div>
+                  <button type="button" class="add-hh-btn" onclick="addEditLPHHSlot()"><i class="material-symbols-outlined">add</i> Add time slot</button>
+                </div>
+
+                <div class="fc-slide-title" style="margin-top:20px;">Local Discount</div>
+                <div class="ld-block" style="margin-top:0;">
+                  <p style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">Applies to all items or a specific one.</p>
+                  <div class="ld-type-row">
+                    <button type="button" class="ld-type-btn" id="editLDTypePercent" onclick="setEditLDType('percent')">% Percent</button>
+                    <button type="button" class="ld-type-btn" id="editLDTypeFixed" onclick="setEditLDType('fixed')">$ Fixed price</button>
+                    <button type="button" class="ld-type-btn active" id="editLDTypeNone" onclick="setEditLDType('none')" style="flex:0.5;">None</button>
+                  </div>
+                  <div id="editLDValueRow" style="display:none;">
+                    <input type="number" class="form-input" id="editLDValue" placeholder="e.g. 20 (for 20% off)" step="0.01" min="0" style="margin-bottom:8px;">
+                  </div>
+                </div>
+              </div>
+
+              <div id="editLPDiscountSection" style="display:none;">
+                <div class="fc-slide-desc">What's the deal, and how much do travellers save?</div>
+                <div class="form-group">
+                  <label class="form-label">Discount (%)</label>
+                  <input type="number" class="form-input" id="editLPDealDiscount" placeholder="e.g. 15" step="1" min="0" max="100">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Discount description</label>
+                  <textarea class="form-textarea" id="editLPDealDescription" placeholder="e.g. 15% off all drinks — show the app to redeem" style="min-height:80px;"></textarea>
+                </div>
+              </div>
+            </div>
+
           </div>
-          <div id="editLPMap" style="height:160px;border-radius:var(--radius-md);overflow:hidden;z-index:1;"></div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Category</label>
-          <div class="type-grid">
-            <button class="type-option" data-lpcat="bar" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sports_bar</i><span>Bar</span></button>
-            <button class="type-option" data-lpcat="coffee shop" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">local_cafe</i><span>Café</span></button>
-            <button class="type-option" data-lpcat="deal" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sell</i><span>Deal</span></button>
-            <button class="type-option" data-lpcat="activity" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">directions_run</i><span>Activities</span></button>
-            <button class="type-option" data-lpcat="hostel" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">bed</i><span>Hostel</span></button>
+        <div class="fc-nav-row">
+          <div class="fc-left-slot">
+            <button type="button" class="fc-delete-btn" id="editLPDeleteBtn" onclick="openDeleteConfirm(editLPActiveCat()==='deal' ? 'deal' : 'localprice')"><i class="material-symbols-outlined">delete</i> Delete</button>
+          </div>
+          <div class="fc-btn-slot">
+            <button type="button" class="fc-next-btn fc-btn-hidden" id="editLPNextBtn" onclick="goToEditLPPhysicalSlide(0)">Done</button>
+            <button type="button" class="fc-next-btn fc-btn-hidden" id="editLPSubmitBtn" onclick="requireAuth(submitLocalPriceEdit)">Submit for review</button>
           </div>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Items &amp; Prices</label>
-          <div id="editLPRows"></div>
-          <button type="button" class="add-price-btn" onclick="addEditLPRow()"><i class="material-symbols-outlined">add</i> Add item</button>
-        </div>
-
-        <!-- Happy Hour -->
-        <div class="hh-block" style="margin-top:4px;">
-          <div class="hh-block-title"><i class="material-symbols-outlined">schedule</i> Happy Hour (optional)</div>
-          <p style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">You can apply happy hour to all items or only a specific one.</p>
-          <div id="editLPHHSlots"></div>
-          <button type="button" class="add-hh-btn" onclick="addEditLPHHSlot()"><i class="material-symbols-outlined">add</i> Add time slot</button>
-        </div>
-
-        <!-- Local Discount -->
-        <div class="ld-block" style="margin-top:12px;">
-          <div class="hh-block-title" style="color:var(--text-dark);"><i class="material-symbols-outlined">local_offer</i> Local Discount (optional)</div>
-          <p style="font-size:11.5px;color:var(--text-light);margin-bottom:8px;">A discount shown to travellers — applies to all items or a specific one.</p>
-          <div class="ld-type-row">
-            <button type="button" class="ld-type-btn" id="editLDTypePercent" onclick="setEditLDType('percent')">% Percent</button>
-            <button type="button" class="ld-type-btn" id="editLDTypeFixed" onclick="setEditLDType('fixed')">$ Fixed price</button>
-            <button type="button" class="ld-type-btn active" id="editLDTypeNone" onclick="setEditLDType('none')" style="flex:0.5;">None</button>
-          </div>
-          <div id="editLDValueRow" style="display:none;">
-            <input type="number" class="form-input" id="editLDValue" placeholder="e.g. 20 (for 20% off)" step="0.01" min="0" style="margin-bottom:8px;">
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-top:12px;">
-          <label class="form-label">Notes (optional)</label>
-          <textarea class="form-textarea" id="editLPNotes" placeholder="Any other info to add or correct…"></textarea>
-        </div>
-        <button class="submit-btn" onclick="requireAuth(submitLocalPriceEdit)">Submit for review</button>
-        <button class="btn-delete-item" onclick="openDeleteConfirm('localprice')"><i class="material-symbols-outlined">delete</i> Delete this listing</button>
-        <p class="submit-note"><i class="material-symbols-outlined">verified_user</i> Only approved edits will update the listing</p>
       </div>
     </div>
 
@@ -663,50 +757,6 @@
         </div>
         <button class="submit-btn" onclick="requireAuth(submitFarmEdit)">Submit for review</button>
         <button class="btn-delete-item" onclick="openDeleteConfirm('farm')"><i class="material-symbols-outlined">delete</i> Delete this listing</button>
-        <p class="submit-note"><i class="material-symbols-outlined">verified_user</i> Only approved edits will update the listing</p>
-      </div>
-    </div>
-
-    <!-- EDIT DEAL MODAL -->
-    <div class="modal-backdrop" id="editDealModal" onclick="handleEditDealBackdrop(event)">
-      <div class="modal-sheet" style="max-height:96vh;overflow-y:auto;">
-        <div class="modal-handle"></div>
-        <div class="u-modal-header">
-          <div class="modal-title" style="margin-bottom:0">Suggest an edit</div>
-          <button class="icon-btn" onclick="document.getElementById('editDealModal').classList.remove('open')"><i class="material-symbols-outlined">close</i></button>
-        </div>
-        <p class="modal-sub">Your changes will be reviewed before going live.</p>
-        <input type="hidden" id="editDealId">
-        <div class="form-group">
-          <label class="form-label">Business name</label>
-          <input type="text" class="form-input" id="editDealName" placeholder="e.g. The Backpacker Bar" maxlength="120">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Business type</label>
-          <input type="text" class="form-input" id="editDealBusinessType" placeholder="e.g. Bar, Café, Hostel…">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Discount (%)</label>
-          <input type="number" class="form-input" id="editDealDiscount" placeholder="e.g. 15" step="1" min="0" max="100">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Discount description</label>
-          <textarea class="form-textarea" id="editDealDescription" placeholder="e.g. 15% off all drinks — show the app to redeem" style="min-height:80px;"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Phone</label>
-          <input type="tel" class="form-input" id="editDealPhone" placeholder="+61 …">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Website</label>
-          <input type="url" class="form-input" id="editDealWebsite" placeholder="https://…">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Notes</label>
-          <textarea class="form-textarea" id="editDealNotes" placeholder="Any other useful info…"></textarea>
-        </div>
-        <button class="submit-btn" onclick="requireAuth(submitDealEdit)">Submit for review</button>
-        <button class="btn-delete-item" onclick="openDeleteConfirm('deal')"><i class="material-symbols-outlined">delete</i> Delete this listing</button>
         <p class="submit-note"><i class="material-symbols-outlined">verified_user</i> Only approved edits will update the listing</p>
       </div>
     </div>
