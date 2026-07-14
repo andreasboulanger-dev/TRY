@@ -8,7 +8,7 @@
 
 // Bump this on every deploy that changes any precached file —
 // it's the only thing that forces old clients to fetch fresh assets.
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const SHELL_CACHE   = `hive-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `hive-runtime-${CACHE_VERSION}`;
 
@@ -35,9 +35,13 @@ const SHELL_ASSETS = [
   './js/search.js',
   './js/home.js',
   './js/bootstrap.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png',
+  './apple-touch-icon.png',
+  './favicon-32.png',
+  './favicon-16.png',
 ];
 
 // Hosts whose responses should NEVER be cached — always hit the network.
