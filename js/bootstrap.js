@@ -2,24 +2,12 @@
 // ║  BOOTSTRAP — App Initialisation                          ║
 // ╚═══════════════════════════════════════════════════════════╝
 
-// ── APP HEIGHT (iOS standalone fix) ──
-// html, body, and #app all read this from one shared CSS rule in
-// styles.css (`html, body, #app { height: var(--app-vh, 100dvh); }`),
-// which falls back to `100dvh` until this runs. iOS home-screen apps have
-// a known WebKit quirk where 100dvh can compute a few px short of the
-// *real* visible height once installed — leaving a gap at the bottom that
-// no safe-area-inset covers, because it isn't a safe-area, it's just a
-// measurement bug in that one context. window.visualViewport.height is
-// accurate there, so measure it directly and feed it in as --app-vh,
-// which that shared rule prefers over 100dvh whenever it's set.
-function setAppHeight() {
-  const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
-  document.documentElement.style.setProperty('--app-vh', vh + 'px');
-}
-setAppHeight();
-window.addEventListener('resize', setAppHeight);
-window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 100));
-if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppHeight);
+// ── APP HEIGHT ──
+// #app is sized with position:fixed + inset:0 in CSS, so it never depends
+// on a measured viewport height — no JS needed here. (There used to be a
+// setAppHeight()/--app-vh mechanism patching a WebKit standalone-mode dvh
+// bug; removed once #app stopped using height at all, since nothing was
+// left consuming the measured value.)
 
 // ── DISABLE ZOOM ──
 // The viewport meta tag (user-scalable=no, maximum-scale=1.0) covers most
