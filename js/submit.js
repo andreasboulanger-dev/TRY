@@ -819,7 +819,7 @@ async function confirmDelete() {
   } else if (type === 'deal') {
     refId = currentDealId || null;
     itemName = 'deal';
-    document.getElementById('editDealModal')?.classList.remove('open');
+    document.getElementById('editLocalPriceModal')?.classList.remove('open');
   }
 
   const submissionType = type === 'localprice' ? 'delete_price'

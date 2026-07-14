@@ -165,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'submitModal':        () => closeSubmit(),
     'editLocalPriceModal':() => closeEditLocalPrice(),
     'editFarmModal':      () => document.getElementById('editFarmModal').classList.remove('open'),
-    'editDealModal':      () => document.getElementById('editDealModal').classList.remove('open'),
     'newPostModal':       () => document.getElementById('newPostModal').classList.remove('open'),
     'communityAddModal':  () => document.getElementById('communityAddModal').classList.remove('open'),
     'newActivityModal':   () => document.getElementById('newActivityModal').classList.remove('open'),

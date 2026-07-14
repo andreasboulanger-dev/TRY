@@ -58,7 +58,8 @@ function refreshPricePinLabels() {
     return;
   }
 
-  // Otherwise just update label text in-place for each price pin
+  // Otherwise just update label text + the happy-hour countdown badge
+  // in-place for each price pin.
   dealMarkers.forEach(marker => {
     const el = marker.getElement();
     if (!el) return;
@@ -76,7 +77,57 @@ function refreshPricePinLabels() {
       labelEl.style.background = '#D4851A';
       setTimeout(() => { labelEl.style.background = ''; }, 600);
     }
+    updatePinHHBadge(el, visibleItems);
   });
+}
+
+// Soonest happy-hour end time (a Date) across a venue's currently-visible
+// priced items, or null if none has one active right now. Thin wrapper
+// around getHHEndTime() (deals.js) — used both for the initial pin render
+// (renderDealMarkers()) and by updatePinHHBadge() below on each refresh.
+function getSoonestHHEnd(items) {
+  let soonest = null;
+  (items || []).forEach(item => {
+    const end = getHHEndTime(item);
+    if (end && (!soonest || end < soonest)) soonest = end;
+  });
+  return soonest;
+}
+
+// Keeps a pin's "Happy hour ⚡ <time>" badge (see makePricePin() below)
+// live — updates the countdown text, adds the badge the moment a venue's
+// soonest HH window becomes active, and removes it once that window ends.
+// (A window opening/closing entirely is already handled by the full
+// re-render above via getHHStateSnapshot() — this covers everything else,
+// i.e. just keeping the displayed time current while it stays active.)
+function updatePinHHBadge(pinEl, visibleItems) {
+  const wrap = pinEl.querySelector('.map-pin-wrap');
+  if (!wrap) return;
+  const hhEnd = getSoonestHHEnd(visibleItems);
+  const msLeft = hhEnd ? hhEnd - new Date() : -1;
+  const showBadge = msLeft > 0;
+  let badgeEl = wrap.querySelector('[data-hh-badge]');
+
+  if (!showBadge) {
+    if (badgeEl) badgeEl.remove();
+    return;
+  }
+
+  const timeText = _formatHHDuration(msLeft);
+  if (!badgeEl) {
+    badgeEl = document.createElement('div');
+    badgeEl.className = 'map-hh-badge';
+    badgeEl.setAttribute('data-hh-badge', '');
+    badgeEl.innerHTML = `<span class="map-hh-badge-label">Happy hour</span><span class="map-hh-badge-time" data-hh-badge-time>\u26A1 ${timeText}</span>`;
+    wrap.appendChild(badgeEl);
+    // Same 5s-then-collapse pattern as the initial render in
+    // renderDealMarkers() (deals.js) — reads in full for a beat, then
+    // shrinks to just the "⚡ <time>" text.
+    setTimeout(() => badgeEl.classList.add('collapsed'), 5000);
+  } else {
+    const timeEl = badgeEl.querySelector('[data-hh-badge-time]');
+    if (timeEl) timeEl.textContent = `\u26A1 ${timeText}`;
+  }
 }
 
 let _priceRefreshInterval = null;
@@ -100,18 +151,40 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ── PIN ICON BUILDERS ──
-function makePin(emoji, color) {
+function makePin(emoji, color, disabled) {
   return L.divIcon({ className: '',
-    html: `<div class="map-pin" style="background:${color}"><span class="map-pin-emoji">${emoji}</span></div>`,
+    html: `<div class="map-pin${disabled ? ' pin-disabled' : ''}" style="background:${color}"><span class="map-pin-emoji">${emoji}</span></div>`,
     iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-38] });
 }
 
-function makePricePin(emoji, color, label) {
+// Small grey dot — used instead of a full pin for a venue that has
+// structured opening_hours_json and is closed right now (see the
+// "Opening-hours pin gating" comment in renderDealMarkers(), deals.js).
+// Still a real, clickable marker with the same popup as always — just
+// visually minimized so open venues stand out on the map.
+function makeDotPin() {
+  return L.divIcon({ className: '',
+    html: `<div class="map-pin-dot"></div>`,
+    iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10] });
+}
+
+function makePricePin(emoji, color, label, disabled, hhBadge) {
+  // hhBadge (optional): { timeText } — passed whenever this venue has an
+  // active happy-hour window right now (see getSoonestHHEnd() above /
+  // renderDealMarkers() in deals.js). Renders a small "Happy hour ⚡
+  // <timeText>" pill above the pin; the "Happy hour" label collapses away
+  // after 5s, leaving just "⚡ <timeText>" — see updatePinHHBadge() above
+  // for how it's kept ticking afterwards.
+  const hhHtml = hhBadge ? `
+      <div class="map-hh-badge" data-hh-badge>
+        <span class="map-hh-badge-label">Happy hour</span><span class="map-hh-badge-time" data-hh-badge-time>\u26A1 ${hhBadge.timeText}</span>
+      </div>` : '';
   // data-price-label lets refreshPricePinLabels() update the text in-place
   return L.divIcon({ className: '',
     html: `<div class="map-pin-wrap">
-      <div class="map-pin" style="background:${color}"><span class="map-pin-emoji">${emoji}</span></div>
+      <div class="map-pin${disabled ? ' pin-disabled' : ''}" style="background:${color}"><span class="map-pin-emoji">${emoji}</span></div>
       <div class="map-price-label" data-price-label style="background:${color}">${label}</div>
+      ${hhHtml}
     </div>`,
     iconSize:[36,54], iconAnchor:[18,36], popupAnchor:[0,-38] });
 }

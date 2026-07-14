@@ -345,5 +345,183 @@ function toggleHoursWidget(id) {
   document.getElementById(id)?.classList.toggle('expanded');
 }
 
+// ── HOURS DROPDOWNS (Local Price / Deal edit sheets, slide 1) ──
+// Builds a <select>'s worth of "HH:MM" options in 30-min steps, each
+// labeled in 12h format via to12h() above.
+function buildTimeOptionsHTML(selected) {
+  let html = '';
+  for (let m = 0; m < 24 * 60; m += 30) {
+    const val = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    html += `<option value="${val}"${val === selected ? ' selected' : ''}>${to12h(val)}</option>`;
+  }
+  return html;
+}
+
+// Fills the two time <select>s for a given prefix ('editLP' or 'editDeal').
+// openVal/closeVal are existing "HH:MM" values (if any) to preselect.
+function populateHoursSelects(openId, closeId, openVal, closeVal) {
+  const openEl = document.getElementById(openId);
+  const closeEl = document.getElementById(closeId);
+  if (openEl)  openEl.innerHTML  = buildTimeOptionsHTML(openVal  || '09:00');
+  if (closeEl) closeEl.innerHTML = buildTimeOptionsHTML(closeVal || '17:00');
+}
+
+// Picks a representative open/close pair out of a venue's existing weekly
+// opening_hours_json (see the schema note above getOpenStatus()) — just
+// the first day that has a slot, since the edit sheet only offers one
+// uniform time for every day.
+function firstHoursSlot(hoursJson) {
+  if (!hoursJson) return null;
+  for (let i = 0; i <= 6; i++) if (hoursJson[i]) return hoursJson[i];
+  return null;
+}
+
+// Builds a full 7-day opening_hours_json applying the same open/close time
+// to every day — the uniform-week simplification the edit sheets submit.
+function buildUniformHoursJson(openVal, closeVal) {
+  if (!openVal || !closeVal) return null;
+  const json = {};
+  for (let i = 0; i <= 6; i++) json[i] = { open: openVal, close: closeVal };
+  return json;
+}
+
+// ── PER-DAY HOURS (Local Price edit sheet — "Different per day" mode) ──
+// Mon→Sun display order, mapped to the 0=Sunday..6=Saturday keys used by
+// opening_hours_json (Date#getDay()).
+const _PERDAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// Renders the 7 day rows into `container`, preselecting from an existing
+// opening_hours_json if given (a day with no slot starts "Closed").
+function renderPerDayHoursRows(container, hoursJson) {
+  if (!container) return;
+  container.innerHTML = _PERDAY_LABELS.map((label, i) => {
+    const dayIdx = (i + 1) % 7; // Mon=1…Sat=6, Sun=0
+    const slot = hoursJson ? hoursJson[dayIdx] : null;
+    const closed = !!hoursJson && !slot;
+    return `<div class="fc-perday-row${closed ? ' is-closed' : ''}" data-day-idx="${dayIdx}">
+      <span class="fc-perday-label">${label}</span>
+      <label class="fc-perday-closed-toggle">
+        <input type="checkbox" class="fc-perday-closed-cb"${closed ? ' checked' : ''} onchange="this.closest('.fc-perday-row').classList.toggle('is-closed', this.checked)">
+        Closed
+      </label>
+      <div class="fc-hours-row fc-perday-hours-row">
+        <input type="time" class="form-input fc-hours-time perday-open" value="${slot?.open || '09:00'}">
+        <span class="fc-hours-sep">to</span>
+        <input type="time" class="form-input fc-hours-time perday-close" value="${slot?.close || '17:00'}">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Reads the rendered day rows back into an opening_hours_json — null for
+// any day whose "Closed" box is ticked. Returns null if nothing is open.
+function buildPerDayHoursJson(container) {
+  if (!container) return null;
+  const json = {};
+  let anyOpen = false;
+  container.querySelectorAll('.fc-perday-row').forEach(row => {
+    const dayIdx = parseInt(row.dataset.dayIdx, 10);
+    if (row.querySelector('.fc-perday-closed-cb')?.checked) { json[dayIdx] = null; return; }
+    const open  = row.querySelector('.perday-open')?.value;
+    const close = row.querySelector('.perday-close')?.value;
+    if (open && close) { json[dayIdx] = { open, close }; anyOpen = true; }
+  });
+  return anyOpen ? json : null;
+}
+
+// True when an existing opening_hours_json is exactly the uniform-week
+// shape (all 7 days present, all identical) — used to decide which mode
+// the edit sheet should default to. Missing data also counts as "uniform"
+// since there's nothing custom to show.
+function isUniformHoursJson(hoursJson) {
+  if (!hoursJson) return true;
+  const days = Object.values(hoursJson);
+  if (days.length < 7 || !days.every(Boolean)) return false;
+  const first = days[0];
+  return days.every(s => s.open === first.open && s.close === first.close);
+}
+
+// ── EDIT-FORM CAROUSEL ──
+// Generic controller for a multi-step bottom-sheet form (see .fc-* rules
+// in styles.css). Call initFormCarousel(prefix, slideCount) each time the
+// sheet opens — it resets to slide 0 and (once) wires up swipe. `prefix`
+// must match the ids used in the markup: #<prefix>Progress (holding one
+// .fc-progress-seg per slide), #<prefix>CarouselWrap/#<prefix>CarouselTrack,
+// and #<prefix>BackBtn/#<prefix>NextBtn/#<prefix>SubmitBtn.
+const _formCarouselState = {};
+
+function initFormCarousel(prefix, slideCount) {
+  _formCarouselState[prefix] = { idx: 0, count: slideCount, touchStartX: null };
+  goToFormSlide(prefix, 0);
+
+  const wrap = document.getElementById(prefix + 'CarouselWrap');
+  if (wrap && !wrap._fcSwipeBound) {
+    wrap._fcSwipeBound = true;
+    wrap.addEventListener('touchstart', e => {
+      _formCarouselState[prefix].touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+    wrap.addEventListener('touchend', e => {
+      const st = _formCarouselState[prefix];
+      if (!st || st.touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - st.touchStartX;
+      if (Math.abs(dx) > 40) goToFormSlide(prefix, st.idx + (dx < 0 ? 1 : -1));
+      st.touchStartX = null;
+    }, { passive: true });
+  }
+}
+
+function goToFormSlide(prefix, idx) {
+  const st = _formCarouselState[prefix];
+  if (!st) return;
+  idx = Math.max(0, Math.min(st.count - 1, idx));
+  st.idx = idx;
+
+  const track = document.getElementById(prefix + 'CarouselTrack');
+  if (track) track.style.transform = `translateX(-${idx * 100}%)`;
+
+  document.querySelectorAll(`#${prefix}Progress .fc-progress-seg`).forEach((seg, i) => {
+    seg.classList.toggle('filled', i <= idx);
+  });
+
+  const isLast = idx === st.count - 1;
+  document.getElementById(prefix + 'BackBtn')?.classList.toggle('fc-hidden', idx === 0);
+  // Delete only makes sense on slide 1 (before Back appears) — cross-fades
+  // with it in the same .fc-left-slot grid cell (see styles.css).
+  document.getElementById(prefix + 'DeleteBtn')?.classList.toggle('fc-hidden', idx !== 0);
+  const nextBtn = document.getElementById(prefix + 'NextBtn');
+  const submitBtn = document.getElementById(prefix + 'SubmitBtn');
+  // Both buttons share one grid cell (.fc-btn-slot) and stay in normal flow
+  // at all times — toggling this class only flips opacity/visibility, so
+  // Next fades into Submit instead of snapping.
+  if (nextBtn) nextBtn.classList.toggle('fc-btn-hidden', isLast);
+  if (submitBtn) submitBtn.classList.toggle('fc-btn-hidden', !isLast);
+
+  // Scroll the sheet back to the top so each new step starts fully in view.
+  track?.closest('.modal-sheet')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextFormSlide(prefix) {
+  const st = _formCarouselState[prefix];
+  if (st) goToFormSlide(prefix, st.idx + 1);
+}
+
+function prevFormSlide(prefix) {
+  const st = _formCarouselState[prefix];
+  if (st) goToFormSlide(prefix, st.idx - 1);
+}
+
+// For a header Back button (as opposed to the in-row step-back button):
+// steps to the previous carousel slide if there is one, otherwise runs
+// `onClose` — so it behaves like a real "back", only closing the sheet
+// once there's nowhere left to go back to.
+function handleFormBack(prefix, onClose) {
+  const st = _formCarouselState[prefix];
+  if (st && st.idx > 0) {
+    prevFormSlide(prefix);
+  } else if (typeof onClose === 'function') {
+    onClose();
+  }
+}
+
 
 

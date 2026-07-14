@@ -9,6 +9,111 @@ let editLDType = 'none';
 function selectEditLPCat(el) {
   document.querySelectorAll('[data-lpcat]').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
+  // Picking "Deal" (or switching away from it) swaps the Items & Prices
+  // slide for a plain Discount form, and relabels its menu row to match.
+  refreshEditLPItemsOrDiscount();
+}
+
+// ── EDIT SHEET — hub/menu navigation ──
+// Slide 0 is a Settings-style menu of five sections; tapping a row jumps
+// straight to that section's own slide (goToEditLPSection) instead of
+// stepping through a fixed order. Physical slide indices in
+// #editLPCarouselTrack: 0 Menu, 1 Name, 2 Location, 3 Hours,
+// 4 Categories, 5 Items & Prices (or Discount, for the "Deal" category).
+// Submit lives on the menu slide itself.
+const EDIT_LP_SLIDES = { menu: 0, name: 1, location: 2, hours: 3, categories: 4, items: 5 };
+const EDIT_LP_TITLES = { 0: 'Edit', 1: 'Business name', 2: 'Location', 3: 'Hours', 4: 'Categories' };
+
+function editLPActiveCat() {
+  return document.querySelector('#editLocalPriceModal [data-lpcat].selected')?.dataset.lpcat || null;
+}
+
+// Items & Prices (with its Happy Hour / Local Discount sub-sections) and
+// the Deal's Discount form live on the same physical slide (5) and are
+// toggled by display — so the menu keeps a single row that relabels
+// itself instead of needing a 7th section just for deals.
+function refreshEditLPItemsOrDiscount() {
+  const isDeal = editLPActiveCat() === 'deal';
+  document.getElementById('editLPItemsSection').style.display = isDeal ? 'none' : '';
+  document.getElementById('editLPDiscountSection').style.display = isDeal ? '' : 'none';
+  const icon = document.getElementById('editLPMenuIconItems');
+  const label = document.getElementById('editLPMenuLabelItems');
+  if (icon) icon.textContent = isDeal ? 'sell' : 'local_offer';
+  if (label) label.textContent = isDeal ? 'Discount' : 'Items & Prices';
+}
+
+function goToEditLPPhysicalSlide(physIdx) {
+  const st = _formCarouselState['editLP'];
+  if (!st) return;
+  st.idx = physIdx;
+
+  const track = document.getElementById('editLPCarouselTrack');
+  if (track) track.style.transform = `translateX(-${physIdx * 100}%)`;
+
+  const isMenu = physIdx === EDIT_LP_SLIDES.menu;
+
+  const titleEl = document.getElementById('editLPModalTitle');
+  if (titleEl) {
+    titleEl.textContent = physIdx === EDIT_LP_SLIDES.items
+      ? (editLPActiveCat() === 'deal' ? 'Discount' : 'Items & Prices')
+      : (EDIT_LP_TITLES[physIdx] || 'Edit');
+  }
+
+  document.getElementById('editLPDeleteBtn')?.classList.toggle('fc-hidden', !isMenu);
+  document.getElementById('editLPNextBtn')?.classList.toggle('fc-btn-hidden', isMenu);
+  document.getElementById('editLPSubmitBtn')?.classList.toggle('fc-btn-hidden', !isMenu);
+
+  if (isMenu) refreshEditLPMenu();
+  if (physIdx === EDIT_LP_SLIDES.location) setTimeout(() => editLPMap && editLPMap.invalidateSize(), 320);
+
+  track?.closest('.modal-sheet')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Menu row tap — jump straight to that section's slide.
+function goToEditLPSection(key) {
+  const idx = EDIT_LP_SLIDES[key];
+  if (idx !== undefined) goToEditLPPhysicalSlide(idx);
+}
+
+// Header "back" button: always returns to the menu from any section;
+// only closes the sheet once the menu itself is showing.
+function handleEditLPBack(onClose) {
+  const st = _formCarouselState['editLP'];
+  if (st && st.idx !== EDIT_LP_SLIDES.menu) goToEditLPPhysicalSlide(EDIT_LP_SLIDES.menu);
+  else if (typeof onClose === 'function') onClose();
+}
+
+function initEditLPCarousel() {
+  _formCarouselState['editLP'] = { idx: 0, count: 6 };
+  refreshEditLPItemsOrDiscount();
+  goToEditLPPhysicalSlide(EDIT_LP_SLIDES.menu);
+}
+
+// ── MENU — live subtitle values on the hub slide ──
+function _editLPSetText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function refreshEditLPMenu() {
+  const name = document.getElementById('editLPName')?.value.trim();
+  _editLPSetText('editLPMenuValName', name || 'Not set');
+
+  _editLPSetText('editLPMenuValLocation', document.getElementById('editLPLat')?.value ? 'Pin set' : 'Not set');
+
+  const sameHours = document.getElementById('editLPHoursModeSame')?.classList.contains('active');
+  _editLPSetText('editLPMenuValHours', sameHours === false ? 'Different per day' : 'Same every day');
+
+  const catBtn = document.querySelector('#editLocalPriceModal [data-lpcat].selected');
+  _editLPSetText('editLPMenuValCat', catBtn ? (catBtn.querySelector('span')?.textContent || 'Set') : 'Not set');
+
+  if (editLPActiveCat() === 'deal') {
+    const disc = document.getElementById('editLPDealDiscount')?.value;
+    _editLPSetText('editLPMenuValItems', disc ? disc + '% off' : 'Not set');
+  } else {
+    const count = document.querySelectorAll('#editLPRows .price-row').length;
+    _editLPSetText('editLPMenuValItems', count ? count + ' item' + (count > 1 ? 's' : '') : 'Not set');
+  }
 }
 
 function setEditLDType(type) {
@@ -87,6 +192,16 @@ let editLPMap = null, editLPMarker = null;
 let editFarmMapInst = null, editFarmMarker = null;
 let editLPSearchDebounce = null, editFarmSearchDebounce = null;
 
+// Suggests a starting business name from the address just picked or the
+// pin's coordinates, without overwriting anything the person already
+// typed. Called on every search-select / marker move (new or corrected
+// location) on the collapsible "Change location" panel.
+function suggestEditLPName(suggestedName) {
+  const input = document.getElementById('editLPName');
+  if (input && !input.value.trim() && suggestedName) input.value = suggestedName;
+}
+
+
 function initEditLPMap(lat, lng) {
   // Always destroy and recreate to avoid blank tiles after modal close/reopen
   if (editLPMap) {
@@ -103,11 +218,13 @@ function initEditLPMap(lat, lng) {
     const ll = editLPMarker.getLatLng();
     document.getElementById('editLPLat').value = ll.lat.toFixed(5);
     document.getElementById('editLPLng').value = ll.lng.toFixed(5);
+    suggestEditLPName(`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`);
   });
   editLPMap.on('click', e => {
     editLPMarker.setLatLng(e.latlng);
     document.getElementById('editLPLat').value = e.latlng.lat.toFixed(5);
     document.getElementById('editLPLng').value = e.latlng.lng.toFixed(5);
+    suggestEditLPName(`${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`);
   });
   setTimeout(() => editLPMap && editLPMap.invalidateSize(), 100);
   setTimeout(() => editLPMap && editLPMap.invalidateSize(), 500);
@@ -151,6 +268,7 @@ function onEditLPSearch(val) {
     document.getElementById('editLPSearchInput').value = label.split(',').slice(0,2).join(',');
     document.getElementById('editLPSearchResults').classList.remove('open');
     document.getElementById('editLPSearchClear').classList.add('visible');
+    suggestEditLPName(label.split(',')[0].trim());
   }), 450);
 }
 
@@ -211,6 +329,9 @@ function closeEditLocalPrice() {
   document.getElementById('editLPSearchInput').value = '';
   document.getElementById('editLPSearchClear').classList.remove('visible');
   document.getElementById('editLPSearchResults').classList.remove('open');
+  document.getElementById('editLPDealId').value = '';
+  document.getElementById('editLPDealDiscount').value = '';
+  document.getElementById('editLPDealDescription').value = '';
   editLDType = 'none';
   ['Percent','Fixed','None'].forEach(t => {
     const btn = document.getElementById('editLDType'+t);
@@ -225,6 +346,19 @@ function closeEditLocalPrice() {
   if (scopeBlock) scopeBlock.remove();
 }
 
+// Switches the Local Price edit sheet's hours block between a single
+// uniform open/close pair and the 7 per-day rows. Called on toggle click
+// and once on open (see openEditLocalPrice) to match the existing data.
+function setEditLPHoursMode(mode) {
+  const same = mode !== 'custom';
+  document.getElementById('editLPHoursModeSame')?.classList.toggle('active', same);
+  document.getElementById('editLPHoursModeCustom')?.classList.toggle('active', !same);
+  const uniformEl = document.getElementById('editLPUniformHours');
+  const perDayEl  = document.getElementById('editLPPerDayHours');
+  if (uniformEl) uniformEl.style.display = same ? '' : 'none';
+  if (perDayEl)  perDayEl.style.display  = same ? 'none' : '';
+}
+
 function openEditLocalPrice() {
   if (!currentUser) { openAuthGate('deals'); return; }
   const group = priceGroupsCache[currentLocalPriceKey];
@@ -233,8 +367,8 @@ function openEditLocalPrice() {
 
   try {
     document.getElementById('editLocalPriceKey').value = currentLocalPriceKey;
+    document.getElementById('editLPDealId').value = '';
     document.getElementById('editLPName').value = p.business_name || '';
-    document.getElementById('editLPNotes').value = '';
 
     document.querySelectorAll('[data-lpcat]').forEach(b => {
       b.classList.toggle('selected', b.dataset.lpcat === cat);
@@ -243,9 +377,11 @@ function openEditLocalPrice() {
     const container = document.getElementById('editLPRows');
     container.innerHTML = items.map(i => `
       <div class="price-row">
-        <input type="text" class="form-input item-name" placeholder="Item" value="${escHTML(i.item_name||'')}" oninput="refreshEditItemScopeDropdowns()">
-        <input type="number" class="form-input item-price" placeholder="Normal price ($)" step="0.01" value="${escHTML(String(i.price_normal||''))}">
+        <input type="text" class="form-input item-name" placeholder="Item" value="${escHTML(i.item_name||'')}" oninput="refreshEditItemScopeDropdowns();updateEditLPRowCheck(this)">
+        <input type="number" class="form-input item-price" placeholder="Normal price ($)" step="0.01" value="${escHTML(String(i.price_normal||''))}" oninput="updateEditLPRowCheck(this)">
+        <i class="material-symbols-outlined price-row-check" aria-hidden="true" title="Correct">check_circle</i>
       </div>`).join('');
+    container.querySelectorAll('.price-row').forEach(row => updateEditLPRowCheck(row));
 
     const hhItem = items.find(i => i.happy_hour_prices);
     const hhSlots = document.getElementById('editLPHHSlots');
@@ -257,7 +393,7 @@ function openEditLocalPrice() {
           addEditLPHHSlot();
           const last = hhSlots.lastElementChild;
           const days = Array.isArray(slot.days) ? slot.days : [];
-          last.querySelectorAll('.hh-day-btn').forEach(b => {
+          last.querySelectorAll('.hh-day-row .hh-day-btn').forEach(b => {
             b.classList.toggle('on', days.includes(b.dataset.day.toLowerCase()));
           });
           last.querySelector('.hh-from').value = slot.from || '17:00';
@@ -304,6 +440,12 @@ function openEditLocalPrice() {
   document.getElementById('editLPLat').value = lat;
   document.getElementById('editLPLng').value = lng;
 
+  const existingSlot = firstHoursSlot(p.opening_hours_json);
+  populateHoursSelects('editLPOpenTime', 'editLPCloseTime', existingSlot?.open, existingSlot?.close);
+  renderPerDayHoursRows(document.getElementById('editLPPerDayHours'), p.opening_hours_json);
+  setEditLPHoursMode(isUniformHoursJson(p.opening_hours_json) ? 'same' : 'custom');
+
+  initEditLPCarousel();
   document.getElementById('editLocalPriceModal').classList.add('open');
   setTimeout(() => initEditLPMap(lat, lng), 350);
 }
@@ -313,10 +455,23 @@ function addEditLPRow() {
   const row = document.createElement('div');
   row.className = 'price-row';
   row.innerHTML = `
-    <input type="text" class="form-input item-name" placeholder="e.g. Pint of beer" oninput="refreshEditItemScopeDropdowns()">
-    <input type="number" class="form-input item-price" placeholder="Normal price ($)" step="0.01">`;
+    <input type="text" class="form-input item-name" placeholder="e.g. Pint of beer" oninput="refreshEditItemScopeDropdowns();updateEditLPRowCheck(this)">
+    <input type="number" class="form-input item-price" placeholder="Normal price ($)" step="0.01" oninput="updateEditLPRowCheck(this)">
+    <i class="material-symbols-outlined price-row-check" aria-hidden="true" title="Correct">check_circle</i>`;
   container.appendChild(row);
   refreshEditItemScopeDropdowns();
+}
+
+// Toggles the row's "Correct" check icon once both its item name and
+// price are filled in with a valid, non-negative number — el can be
+// either an input inside the row or the row itself.
+function updateEditLPRowCheck(el) {
+  const row = el.classList && el.classList.contains('price-row') ? el : el.closest('.price-row');
+  if (!row) return;
+  const name  = row.querySelector('.item-name')?.value.trim();
+  const price = parseFloat(row.querySelector('.item-price')?.value);
+  const valid = !!name && !isNaN(price) && price >= 0;
+  row.classList.toggle('price-row-valid', valid);
 }
 
 async function submitLocalPriceEdit() {
@@ -325,6 +480,11 @@ async function submitLocalPriceEdit() {
 
   const catEl = document.querySelector('[data-lpcat].selected');
   if (!catEl) { showToast('Please select a category'); return; }
+
+  if (catEl.dataset.lpcat === 'deal') {
+    await submitDealEditFromLP(name);
+    return;
+  }
 
   const rows = document.querySelectorAll('#editLPRows .price-row');
 
@@ -355,8 +515,17 @@ async function submitLocalPriceEdit() {
 
   const hhData = getEditHHData();
   const ldData = getEditLDData();
-  const notes  = document.getElementById('editLPNotes').value.trim();
   const editRef = document.getElementById('editLocalPriceKey').value;
+
+  const editLPHoursCustom = document.getElementById('editLPHoursModeCustom')?.classList.contains('active');
+  let openingHoursJson;
+  if (editLPHoursCustom) {
+    openingHoursJson = buildPerDayHoursJson(document.getElementById('editLPPerDayHours'));
+  } else {
+    const openTime  = document.getElementById('editLPOpenTime')?.value;
+    const closeTime = document.getElementById('editLPCloseTime')?.value;
+    openingHoursJson = buildUniformHoursJson(openTime, closeTime);
+  }
 
   // Use updated lat/lng from map picker (falls back to cached values)
   const group = priceGroupsCache[editRef];
@@ -410,7 +579,8 @@ async function submitLocalPriceEdit() {
         item_price:        row.itemPrice,
         happy_hour_prices: hhData || null,
         local_discount:    ldData || null,
-        details:           ['EDIT OF: ' + editRef, notes ? 'NOTES: ' + notes : ''].filter(Boolean).join('\n'),
+        opening_hours_json: openingHoursJson,
+        details:           'EDIT OF: ' + editRef,
         // ID-based match: target_id is the actual local_prices.id for this item.
         // Falls back to null for newly added items (no existing row to update → INSERT path).
         target_id:         itemIdMap[row.itemName] || null,
@@ -436,64 +606,90 @@ async function submitLocalPriceEdit() {
 let currentDealId = null;
 
 // ── DEAL EDIT ──
+// Deals are edited through the same sheet as local prices (#editLocalPriceModal).
+// This populates the shared fields (name, hours, location) plus the deal-only
+// ones (editLPDealDiscount/editLPDealDescription), pre-selects the "Deal"
+// category pill, and clears out the items/happy-hour/local-discount state
+// that doesn't apply to a deal offer. See refreshEditLPItemsOrDiscount()
+// above for how the "Deal" category swaps in the Discount form instead.
 function openEditDeal() {
   if (!currentUser) { openAuthGate('deals'); return; }
   const d = allDeals.find(x => x.id === currentDealId);
   if (!d) return;
 
-  document.getElementById('editDealId').value          = d.id;
-  document.getElementById('editDealName').value        = d.business_name      || '';
-  document.getElementById('editDealBusinessType').value= d.business_type      || '';
-  document.getElementById('editDealDiscount').value    = parseFloat(d.discount||0) || '';
-  document.getElementById('editDealDescription').value = d.discount_description|| '';
-  document.getElementById('editDealPhone').value       = d.contact_phone      || '';
-  document.getElementById('editDealWebsite').value     = d.website            || '';
-  document.getElementById('editDealNotes').value       = d.notes              || '';
+  document.getElementById('editLocalPriceKey').value = '';
+  document.getElementById('editLPDealId').value       = d.id;
+  document.getElementById('editLPName').value         = d.business_name || '';
 
-  document.getElementById('editDealModal').classList.add('open');
+  document.querySelectorAll('[data-lpcat]').forEach(b => {
+    b.classList.toggle('selected', b.dataset.lpcat === 'deal');
+  });
+
+  // Items / Happy Hour / Local Discount don't apply to a deal — clear them out.
+  document.getElementById('editLPRows').innerHTML = '';
+  document.getElementById('editLPHHSlots').innerHTML = '';
+  setEditLDType('none');
+
+  document.getElementById('editLPDealDiscount').value    = parseFloat(d.discount || 0) || '';
+  document.getElementById('editLPDealDescription').value = d.discount_description || '';
+
+  const existingSlot = firstHoursSlot(d.opening_hours_json);
+  populateHoursSelects('editLPOpenTime', 'editLPCloseTime', existingSlot?.open, existingSlot?.close);
+  renderPerDayHoursRows(document.getElementById('editLPPerDayHours'), d.opening_hours_json);
+  setEditLPHoursMode(isUniformHoursJson(d.opening_hours_json) ? 'same' : 'custom');
+
+  const lat = parseFloat(d.latitude) || -45.03;
+  const lng = parseFloat(d.longitude) || 168.66;
+  document.getElementById('editLPLat').value = lat;
+  document.getElementById('editLPLng').value = lng;
+
+  initEditLPCarousel();
+  document.getElementById('editLocalPriceModal').classList.add('open');
+  setTimeout(() => initEditLPMap(lat, lng), 350);
 }
 
-function handleEditDealBackdrop(e) {
-  if (e.target === document.getElementById('editDealModal'))
-    document.getElementById('editDealModal').classList.remove('open');
-}
+async function submitDealEditFromLP(name) {
+  const dealId     = document.getElementById('editLPDealId').value;
+  const cachedDeal = dealId && allDeals ? allDeals.find(d => d.id === dealId) : null;
 
-async function submitDealEdit() {
-  const name = document.getElementById('editDealName').value.trim();
-  if (!name) { showToast('Please enter a business name'); return; }
+  const _discount = document.getElementById('editLPDealDiscount').value.trim();
+  const _desc     = document.getElementById('editLPDealDescription').value.trim();
 
-  const dealId      = document.getElementById('editDealId').value;
-  const cachedDeal  = allDeals ? allDeals.find(d => d.id === dealId) : null;
-  const _bizType    = document.getElementById('editDealBusinessType').value.trim();
-  const _discount   = document.getElementById('editDealDiscount').value.trim();
-  const _desc       = document.getElementById('editDealDescription').value.trim();
-  const _phone      = document.getElementById('editDealPhone').value.trim();
-  const _website    = document.getElementById('editDealWebsite').value.trim();
-  const _notes      = document.getElementById('editDealNotes').value.trim();
+  const editLPHoursCustom = document.getElementById('editLPHoursModeCustom')?.classList.contains('active');
+  let openingHoursJson;
+  if (editLPHoursCustom) {
+    openingHoursJson = buildPerDayHoursJson(document.getElementById('editLPPerDayHours'));
+  } else {
+    const openTime  = document.getElementById('editLPOpenTime')?.value;
+    const closeTime = document.getElementById('editLPCloseTime')?.value;
+    openingHoursJson = buildUniformHoursJson(openTime, closeTime);
+  }
+
+  const lat = parseFloat(document.getElementById('editLPLat').value) || (cachedDeal ? parseFloat(cachedDeal.latitude) : null);
+  const lng = parseFloat(document.getElementById('editLPLng').value) || (cachedDeal ? parseFloat(cachedDeal.longitude) : null);
 
   const payload = {
     type:                  'deal_edit',
     business_name:         name,
-    details:               ['EDIT OF: ' + dealId, _notes ? 'NOTES: ' + _notes : ''].filter(Boolean).join('\n'),
-    business_type:         _bizType   || (cachedDeal ? cachedDeal.business_type : null),
+    details:               dealId ? 'EDIT OF: ' + dealId : null,
+    business_type:         cachedDeal ? cachedDeal.business_type : null,
     discount:              parseFloat(_discount) || null,
-    discount_description:  _desc      || null,
-    contact_phone:         _phone     || null,
-    website:               _website   || null,
-    latitude:              cachedDeal ? cachedDeal.latitude     : null,
-    longitude:             cachedDeal ? cachedDeal.longitude    : null,
+    discount_description:  _desc || null,
+    opening_hours_json:    openingHoursJson,
+    latitude:              lat,
+    longitude:             lng,
     country:               cachedDeal ? cachedDeal.country      : null,
     state_region:          cachedDeal ? cachedDeal.state_region : null,
     city:                  cachedDeal ? cachedDeal.city         : null,
     address:               cachedDeal ? cachedDeal.address      : null,
-    target_id:             dealId     || null,
+    target_id:             dealId || null,
     submitted_by_email:    currentUser?.email || null,
     admin_decision:        'pending',
   };
 
   try {
     await supaInsert('submissions', payload);
-    document.getElementById('editDealModal').classList.remove('open');
+    closeEditLocalPrice();
     setTimeout(() => showToast('Edit submitted — thanks! 🐝'), 300);
   } catch(e) {
     if (e?.message === 'Please sign in to submit.') { openAuthGate('deals'); return; }
@@ -506,6 +702,12 @@ let priceGroupsCache = {};
 
 const dealEmoji = {'coffee shop':'☕','hostel':'🛏️','bar':'🍺','restaurant':'🍽️','activity':'🏄','deal':'🏷️','default':'🏪'};
 const dealColor = {'coffee shop':'#795548','hostel':'#1565C0','bar':'#D84315','restaurant':'#2E7D32','activity':'#6A1B9A','deal':'#00796B','default':'#D4851A'};
+// Used instead of the category color for a venue that has no structured
+// opening_hours_json at all — we can't tell open from closed, so the pin
+// is shown "disabled" (greyed out) rather than either fully-colored or
+// hidden. Matches the app's existing muted/secondary-text token so it
+// reads as "disabled" consistently with the rest of the UI, light or dark.
+const DISABLED_PIN_COLOR = 'var(--md-sys-color-on-surface-variant)';
 
 function initDealMap() {
   dealsLoaded = true;
@@ -1388,22 +1590,57 @@ function renderDealMarkers(deals, priceFilter, overridePrices) {
     const loc = [city, country].filter(Boolean).join(', ');
     const safeKey = encodeURIComponent(key);
 
+    // ── Opening-hours pin gating ──
+    // dealGroup and priceGroup both flatten from the same `venues` row (see
+    // flattenVenue() in utils.js), so opening_hours_json is identical either
+    // way — prefer dealGroup the same way businessName/city/country do above,
+    // just for consistency, not because the value would actually differ.
+    //   - Structured hours + currently closed → pin shrinks to a small grey
+    //     dot (still tappable — same popup as always, see makeDotPin() in
+    //     map.js).
+    //   - No structured hours at all (we can't tell open from closed)
+    //     → pin still shows at full size, but greyed out/"disabled",
+    //     including the category emoji itself.
+    //   - Structured hours + currently open → unchanged, normal pin.
+    const hoursJson = dealGroup ? dealGroup.deals[0].opening_hours_json : priceGroup.p.opening_hours_json;
+    let pinDisabled = false;
+    let pinDot = false;
+    if (hoursJson) {
+      const status = getOpenStatus(hoursJson);
+      if (status && !status.isOpen) pinDot = true; // closed right now — shrink to a small grey dot
+    } else {
+      pinDisabled = true; // no open/close data at all
+    }
+
     // Icon: prefer the deal's category glyph/color when a deal is present
     // (matches prior deals-only behavior); price pin style shows the $
-    // label whenever price data exists, combined or not.
-    let icon, zOffset = 0;
-    if (priceGroup) {
+    // label whenever price data exists, combined or not. A closed venue
+    // (pinDot) skips all of this and just gets the small grey dot.
+    let icon, zOffset = 0, hhBadge = null;
+    if (pinDot) {
+      icon = makeDotPin();
+    } else if (priceGroup) {
       const t = dealGroup ? (dealGroup.deals[0].business_type||'').toLowerCase() : null;
       const emoji = (t && dealEmoji[t]) || dealEmoji[priceGroup.cat] || '💰';
-      const color = (t && dealColor[t]) || dealColor[priceGroup.cat] || '#5C5750';
+      const color = pinDisabled ? DISABLED_PIN_COLOR : ((t && dealColor[t]) || dealColor[priceGroup.cat] || '#5C5750');
       const priceLabel = priceGroup.minPrice !== null ? `$${priceGroup.minPrice.toFixed(2)}` : '';
-      icon = makePricePin(emoji, color, priceLabel);
+      // Happy-hour pin badge — shown whenever this venue has an active
+      // window right now, however long is left (see makePricePin()/
+      // updatePinHHBadge() in map.js, and _formatHHDuration() below for the
+      // "Xm" vs "Xh Ym" vs "Xd Yh" formatting).
+      const hhEnd = getSoonestHHEnd(priceGroup.visibleItems);
+      const hhMsLeft = hhEnd ? hhEnd - new Date() : -1;
+      if (hhMsLeft > 0) {
+        hhBadge = { timeText: _formatHHDuration(hhMsLeft) };
+      }
+      icon = makePricePin(emoji, color, priceLabel, pinDisabled, hhBadge);
       zOffset = (globalMax !== null && globalMin !== null && globalMax > globalMin)
         ? Math.round((1 - (priceGroup.minPrice - globalMin) / (globalMax - globalMin)) * 1000)
         : 0;
     } else {
       const t = (dealGroup.deals[0].business_type||'').toLowerCase();
-      icon = makePin(dealEmoji[t]||dealEmoji.default, dealColor[t]||dealColor.default);
+      const color = pinDisabled ? DISABLED_PIN_COLOR : (dealColor[t]||dealColor.default);
+      icon = makePin(dealEmoji[t]||dealEmoji.default, color, pinDisabled);
     }
 
     // Builds popup HTML fresh each time (prices change with happy-hour windows)
@@ -1472,6 +1709,14 @@ function renderDealMarkers(deals, priceFilter, overridePrices) {
     marker._hiveVenueKey = key; // lets other code (e.g. search-select) find this exact marker
     if (priceGroup) marker._hivePriceKey = key; // used by refreshPricePinLabels() — only meaningful when a price component exists
     marker._hiveBuildPopup = buildPopupHTML;
+    // Collapse the pin's "Happy hour" label down to just "⚡ Xm" 5s after
+    // it first renders — same pattern as the popup card's own HH badge
+    // (scheduleHHLabelCollapse() below), just a longer delay since this one
+    // sits passively on the map rather than being opened deliberately.
+    if (hhBadge) {
+      const badgeEl = marker.getElement()?.querySelector('[data-hh-badge]');
+      if (badgeEl) setTimeout(() => badgeEl.classList.add('collapsed'), 5000);
+    }
     // hideClose: no ✕ button — dismiss by tapping the map or dragging the
     // card down instead. blurBackdrop + dragHandle: see styles.css / map.js.
     // onOpen starts the happy-hour countdown badge if the popup has one.
