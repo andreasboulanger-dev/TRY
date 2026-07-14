@@ -8,7 +8,7 @@
 
 // Bump this on every deploy that changes any precached file —
 // it's the only thing that forces old clients to fetch fresh assets.
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const SHELL_CACHE   = `hive-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `hive-runtime-${CACHE_VERSION}`;
 
