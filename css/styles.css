@@ -438,6 +438,11 @@ html,body {
   height:100dvh; /* keep in lockstep with #app below so a percentage/dvh
     mismatch between parent and child can never leave body's box shorter
     than #app's and clip it under this rule's own overflow:hidden */
+  height: var(--app-vh, 100dvh); /* mirrors #app's fix below: same iOS
+    standalone-mode quirk, same JS-measured value from setAppHeight() in
+    bootstrap.js — #app inherits --app-vh from html, so without this line
+    body's box could still land shorter than #app's despite the comment
+    above */
   overflow:hidden;
   font-family:'Roboto Flex', sans-serif;
   /* Was var(--off-white), which is a *different* color from #app's own
