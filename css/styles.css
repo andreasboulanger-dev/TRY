@@ -434,8 +434,10 @@ html.dark {
 }
 
 html,body {
-  height:100%; /* pre-dvh fallback only — see the shared rule after #app
-    below for what actually wins in any browser that understands dvh */
+  height:100%; /* Static and sufficient — #app is position:fixed/inset:0
+    (below) so it never reads this value, and nothing else needs html/body's
+    height to be pixel-accurate. See the note after #app for why there's no
+    JS/dvh mechanism here anymore. */
   overflow:hidden;
   font-family:'Roboto Flex', sans-serif;
   /* Was var(--off-white), which is a *different* color from #app's own
@@ -457,13 +459,12 @@ html,body {
   display:flex;
   flex-direction:column;
   /* position:fixed + inset:0 instead of a height:100dvh/100vh calculation —
-     iOS standalone PWAs have a WebKit bug where dvh/vh (and the
-     visualViewport-based --app-vh JS fallback below) can resolve short of
-     the true visible height, leaving a persistent gap of blank body
-     background below the app on the home-screen-installed app. Anchoring
-     to all four edges sidesteps the bug entirely: there's no viewport-unit
-     length being computed, just "fill the box between these edges", which
-     WebKit gets right even when its dvh math doesn't. */
+     iOS standalone PWAs have a WebKit bug where dvh/vh units can resolve
+     short of the true visible height, leaving a persistent gap of blank
+     body background below the app once installed to the home screen.
+     Anchoring to all four edges sidesteps the bug entirely: there's no
+     viewport-unit length being computed, just "fill the box between these
+     edges", which WebKit gets right even when its dvh math doesn't. */
   position:fixed;
   inset:0;
   width:100%;
@@ -472,18 +473,16 @@ html,body {
   overflow:hidden;
 }
 
-/* Real height for html and body — written ONCE, here, on purpose.
-   #app no longer needs this (see position:fixed/inset above) but html/body
-   still size themselves the old way, so this JS-measured value keeps them
-   accurate as a backstop. --app-vh is measured live in JS from
-   window.visualViewport (see setAppHeight() in bootstrap.js) and set on
-   <html>, so body picks it up through ordinary CSS inheritance — it wins
-   here whenever it's set. 100dvh is the pre-JS fallback; the 100% above is
-   the fallback for browsers with no dvh support at all. */
-html, body {
-  height:100dvh;
-  height: var(--app-vh, 100dvh);
-}
+/* Nothing below this point still needs a JS-measured height: #app is
+   position:fixed/inset:0 (see above) so it never derives its size from
+   html/body's height at all, and every modal's `max-height: NNdvh` is
+   inherently viewport-relative regardless of html's own CSS height. So
+   html/body just get a plain, static height — no dvh unit, no JS, no
+   resize listeners, nothing that can drift or come back short in
+   standalone mode. (The old `--app-vh` JS mechanism in bootstrap.js and
+   the height:var(--app-vh, 100dvh) rule it fed have been removed
+   entirely — they only ever existed to patch #app's height, and #app
+   doesn't use a height at all anymore.) */
 
 /* HEADER */
 
