@@ -8,9 +8,9 @@
 
 <!-- ── PWA: manifest + icons ── -->
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
 <!-- iOS: Safari doesn't read the manifest for install behaviour, so these
      duplicate the relevant bits directly. -->
@@ -20,7 +20,7 @@
 
 <!-- Windows tile color, for pinned-to-start-menu installs -->
 <meta name="msapplication-TileColor" content="#142800">
-<meta name="msapplication-TileImage" content="icons/icon-192.png">
+<meta name="msapplication-TileImage" content="icon-192.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,14 +149,6 @@
     })();
   </script>
 
-
-  <!-- Progressive blur scrim — sits behind the floating header, mirrors
-       the one behind the floating bottom nav below. -->
-  <div class="header-blur-scrim" aria-hidden="true">
-    <div class="header-blur-layer header-blur-layer-1"></div>
-    <div class="header-blur-layer header-blur-layer-2"></div>
-    <div class="header-blur-layer header-blur-layer-3"></div>
-  </div>
 
   <header class="app-header">
     <div class="header-search-bar" id="headerSearchBar">
@@ -989,14 +981,6 @@
   <button class="fab" id="communityFab" onclick="openCommunityAdd()" aria-label="Add" style="display:none;">
     <i class="material-symbols-outlined">add</i>
   </button>
-
-  <!-- Progressive blur scrim — sits behind the floating nav so content
-       scrolling underneath fades from sharp to blurred as it nears the nav. -->
-  <div class="nav-blur-scrim" aria-hidden="true">
-    <div class="nav-blur-layer nav-blur-layer-1"></div>
-    <div class="nav-blur-layer nav-blur-layer-2"></div>
-    <div class="nav-blur-layer nav-blur-layer-3"></div>
-  </div>
 
   <nav class="bottom-nav">
     <button class="nav-item active" onclick="goTo('home')" id="nav-home"><span class="nav-pill"><i class="material-symbols-outlined">home</i><span class="nav-label">Home</span></span></button>
