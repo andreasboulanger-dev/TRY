@@ -6,9 +6,20 @@ let currentLocalPriceKey = null;
 
 let editLDType = 'none';
 
+// Categories are multi-select (Bar + Café + Activities can all be on at
+// once), except "Deal" — picking it clears every other category (it
+// swaps the Items & Prices slide for a Discount form, which doesn't make
+// sense combined with anything else); picking any other category while
+// Deal is active turns Deal back off.
 function selectEditLPCat(el) {
-  document.querySelectorAll('[data-lpcat]').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
+  const isDeal = el.dataset.lpcat === 'deal';
+  if (isDeal) {
+    document.querySelectorAll('[data-lpcat]').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+  } else {
+    document.querySelector('#editLocalPriceModal [data-lpcat="deal"]')?.classList.remove('selected');
+    el.classList.toggle('selected');
+  }
   // Picking "Deal" (or switching away from it) swaps the Items & Prices
   // slide for a plain Discount form, and relabels its menu row to match.
   refreshEditLPItemsOrDiscount();
@@ -24,8 +35,18 @@ function selectEditLPCat(el) {
 const EDIT_LP_SLIDES = { menu: 0, name: 1, location: 2, hours: 3, categories: 4, items: 5 };
 const EDIT_LP_TITLES = { 0: 'Edit', 1: 'Business name', 2: 'Location', 3: 'Hours', 4: 'Categories' };
 
+// Single representative category — 'deal' if Deal is selected, otherwise
+// the first of however many non-deal categories are selected. Used only
+// to decide the Items-vs-Discount slide; use editLPSelectedCats() below
+// for the full multi-select list to actually save.
 function editLPActiveCat() {
   return document.querySelector('#editLocalPriceModal [data-lpcat].selected')?.dataset.lpcat || null;
+}
+
+// Every selected category's raw value, in menu order (Bar, Café, Deal,
+// Activities, Hostel) — what actually gets comma-joined and saved.
+function editLPSelectedCats() {
+  return [...document.querySelectorAll('#editLocalPriceModal [data-lpcat].selected')].map(b => b.dataset.lpcat);
 }
 
 // Items & Prices (with its Happy Hour / Local Discount sub-sections) and
@@ -101,11 +122,13 @@ function refreshEditLPMenu() {
 
   _editLPSetText('editLPMenuValLocation', document.getElementById('editLPLat')?.value ? 'Pin set' : 'Not set');
 
-  const sameHours = document.getElementById('editLPHoursModeSame')?.classList.contains('active');
-  _editLPSetText('editLPMenuValHours', sameHours === false ? 'Different per day' : 'Same every day');
+  const hoursJson = buildHoursJsonFromBlocks(document.getElementById('editLPHoursBlocks'));
+  const openDayCount = hoursJson ? Object.keys(hoursJson).length : 0;
+  _editLPSetText('editLPMenuValHours', openDayCount ? `${openDayCount} day${openDayCount > 1 ? 's' : ''} set` : 'Not set');
 
-  const catBtn = document.querySelector('#editLocalPriceModal [data-lpcat].selected');
-  _editLPSetText('editLPMenuValCat', catBtn ? (catBtn.querySelector('span')?.textContent || 'Set') : 'Not set');
+  const catBtns = [...document.querySelectorAll('#editLocalPriceModal [data-lpcat].selected')];
+  const catLabels = catBtns.map(b => b.querySelector('span:not(.type-option-check)')?.textContent).filter(Boolean);
+  _editLPSetText('editLPMenuValCat', catLabels.length ? catLabels.join(', ') : 'Not set');
 
   if (editLPActiveCat() === 'deal') {
     const disc = document.getElementById('editLPDealDiscount')?.value;
@@ -346,19 +369,6 @@ function closeEditLocalPrice() {
   if (scopeBlock) scopeBlock.remove();
 }
 
-// Switches the Local Price edit sheet's hours block between a single
-// uniform open/close pair and the 7 per-day rows. Called on toggle click
-// and once on open (see openEditLocalPrice) to match the existing data.
-function setEditLPHoursMode(mode) {
-  const same = mode !== 'custom';
-  document.getElementById('editLPHoursModeSame')?.classList.toggle('active', same);
-  document.getElementById('editLPHoursModeCustom')?.classList.toggle('active', !same);
-  const uniformEl = document.getElementById('editLPUniformHours');
-  const perDayEl  = document.getElementById('editLPPerDayHours');
-  if (uniformEl) uniformEl.style.display = same ? '' : 'none';
-  if (perDayEl)  perDayEl.style.display  = same ? 'none' : '';
-}
-
 function openEditLocalPrice() {
   if (!currentUser) { openAuthGate('deals'); return; }
   const group = priceGroupsCache[currentLocalPriceKey];
@@ -370,8 +380,13 @@ function openEditLocalPrice() {
     document.getElementById('editLPDealId').value = '';
     document.getElementById('editLPName').value = p.business_name || '';
 
+    // p.item_category_first can itself be a comma-separated list (see
+    // firstCategoryLabel's comment) even though its name suggests one
+    // value — split and normalize each token so every matching category
+    // pill gets preselected, not just the first.
+    const existingCats = (p.item_category_first || '').split(',').map(c => normalizePriceCat(c.trim())).filter(Boolean);
     document.querySelectorAll('[data-lpcat]').forEach(b => {
-      b.classList.toggle('selected', b.dataset.lpcat === cat);
+      b.classList.toggle('selected', existingCats.includes(b.dataset.lpcat));
     });
 
     const container = document.getElementById('editLPRows');
@@ -440,10 +455,7 @@ function openEditLocalPrice() {
   document.getElementById('editLPLat').value = lat;
   document.getElementById('editLPLng').value = lng;
 
-  const existingSlot = firstHoursSlot(p.opening_hours_json);
-  populateHoursSelects('editLPOpenTime', 'editLPCloseTime', existingSlot?.open, existingSlot?.close);
-  renderPerDayHoursRows(document.getElementById('editLPPerDayHours'), p.opening_hours_json);
-  setEditLPHoursMode(isUniformHoursJson(p.opening_hours_json) ? 'same' : 'custom');
+  renderHoursBlocks(document.getElementById('editLPHoursBlocks'), p.opening_hours_json);
 
   initEditLPCarousel();
   document.getElementById('editLocalPriceModal').classList.add('open');
@@ -478,10 +490,10 @@ async function submitLocalPriceEdit() {
   const name = document.getElementById('editLPName').value.trim();
   if (!name) { showToast('Please enter a business name'); return; }
 
-  const catEl = document.querySelector('[data-lpcat].selected');
-  if (!catEl) { showToast('Please select a category'); return; }
+  const selectedCats = editLPSelectedCats();
+  if (!selectedCats.length) { showToast('Please select at least one category'); return; }
 
-  if (catEl.dataset.lpcat === 'deal') {
+  if (selectedCats.includes('deal')) {
     await submitDealEditFromLP(name);
     return;
   }
@@ -517,15 +529,7 @@ async function submitLocalPriceEdit() {
   const ldData = getEditLDData();
   const editRef = document.getElementById('editLocalPriceKey').value;
 
-  const editLPHoursCustom = document.getElementById('editLPHoursModeCustom')?.classList.contains('active');
-  let openingHoursJson;
-  if (editLPHoursCustom) {
-    openingHoursJson = buildPerDayHoursJson(document.getElementById('editLPPerDayHours'));
-  } else {
-    const openTime  = document.getElementById('editLPOpenTime')?.value;
-    const closeTime = document.getElementById('editLPCloseTime')?.value;
-    openingHoursJson = buildUniformHoursJson(openTime, closeTime);
-  }
+  const openingHoursJson = buildHoursJsonFromBlocks(document.getElementById('editLPHoursBlocks'));
 
   // Use updated lat/lng from map picker (falls back to cached values)
   const group = priceGroupsCache[editRef];
@@ -574,7 +578,7 @@ async function submitLocalPriceEdit() {
       const payload = {
         type:              'price',
         business_name:     name,
-        item_category:     catEl.dataset.lpcat,
+        item_category:     selectedCats.join(','),
         item_name:         row.itemName,
         item_price:        row.itemPrice,
         happy_hour_prices: hhData || null,
@@ -633,10 +637,7 @@ function openEditDeal() {
   document.getElementById('editLPDealDiscount').value    = parseFloat(d.discount || 0) || '';
   document.getElementById('editLPDealDescription').value = d.discount_description || '';
 
-  const existingSlot = firstHoursSlot(d.opening_hours_json);
-  populateHoursSelects('editLPOpenTime', 'editLPCloseTime', existingSlot?.open, existingSlot?.close);
-  renderPerDayHoursRows(document.getElementById('editLPPerDayHours'), d.opening_hours_json);
-  setEditLPHoursMode(isUniformHoursJson(d.opening_hours_json) ? 'same' : 'custom');
+  renderHoursBlocks(document.getElementById('editLPHoursBlocks'), d.opening_hours_json);
 
   const lat = parseFloat(d.latitude) || -45.03;
   const lng = parseFloat(d.longitude) || 168.66;
@@ -655,15 +656,7 @@ async function submitDealEditFromLP(name) {
   const _discount = document.getElementById('editLPDealDiscount').value.trim();
   const _desc     = document.getElementById('editLPDealDescription').value.trim();
 
-  const editLPHoursCustom = document.getElementById('editLPHoursModeCustom')?.classList.contains('active');
-  let openingHoursJson;
-  if (editLPHoursCustom) {
-    openingHoursJson = buildPerDayHoursJson(document.getElementById('editLPPerDayHours'));
-  } else {
-    const openTime  = document.getElementById('editLPOpenTime')?.value;
-    const closeTime = document.getElementById('editLPCloseTime')?.value;
-    openingHoursJson = buildUniformHoursJson(openTime, closeTime);
-  }
+  const openingHoursJson = buildHoursJsonFromBlocks(document.getElementById('editLPHoursBlocks'));
 
   const lat = parseFloat(document.getElementById('editLPLat').value) || (cachedDeal ? parseFloat(cachedDeal.latitude) : null);
   const lng = parseFloat(document.getElementById('editLPLng').value) || (cachedDeal ? parseFloat(cachedDeal.longitude) : null);

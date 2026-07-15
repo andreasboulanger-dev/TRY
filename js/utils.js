@@ -357,88 +357,116 @@ function buildTimeOptionsHTML(selected) {
   return html;
 }
 
-// Fills the two time <select>s for a given prefix ('editLP' or 'editDeal').
-// openVal/closeVal are existing "HH:MM" values (if any) to preselect.
-function populateHoursSelects(openId, closeId, openVal, closeVal) {
-  const openEl = document.getElementById(openId);
-  const closeEl = document.getElementById(closeId);
-  if (openEl)  openEl.innerHTML  = buildTimeOptionsHTML(openVal  || '09:00');
-  if (closeEl) closeEl.innerHTML = buildTimeOptionsHTML(closeVal || '17:00');
-}
-
-// Picks a representative open/close pair out of a venue's existing weekly
-// opening_hours_json (see the schema note above getOpenStatus()) — just
-// the first day that has a slot, since the edit sheet only offers one
-// uniform time for every day.
-function firstHoursSlot(hoursJson) {
-  if (!hoursJson) return null;
-  for (let i = 0; i <= 6; i++) if (hoursJson[i]) return hoursJson[i];
-  return null;
-}
-
-// Builds a full 7-day opening_hours_json applying the same open/close time
-// to every day — the uniform-week simplification the edit sheets submit.
-function buildUniformHoursJson(openVal, closeVal) {
-  if (!openVal || !closeVal) return null;
-  const json = {};
-  for (let i = 0; i <= 6; i++) json[i] = { open: openVal, close: closeVal };
-  return json;
-}
-
-// ── PER-DAY HOURS (Local Price edit sheet — "Different per day" mode) ──
+// ── HOURS BLOCKS (Local Price / Deal edit sheet) ──
+// Google-Business-style editor: one or more "blocks", each a set of day
+// circles sharing one open→close range (or "Open 24h"). Adding a block
+// lets different day-groups (e.g. weekdays vs weekend) have different
+// hours. If a day is toggled on in more than one block, the later block
+// (lower in the list) wins when the form is submitted.
 // Mon→Sun display order, mapped to the 0=Sunday..6=Saturday keys used by
 // opening_hours_json (Date#getDay()).
-const _PERDAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const _HOURS_BLOCK_DAY_ORDER  = [1, 2, 3, 4, 5, 6, 0]; // Mon…Sat, Sun
+const _HOURS_BLOCK_DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+let _hoursBlockSeq = 0; // unique suffix for each block's <select> ids
 
-// Renders the 7 day rows into `container`, preselecting from an existing
-// opening_hours_json if given (a day with no slot starts "Closed").
-function renderPerDayHoursRows(container, hoursJson) {
-  if (!container) return;
-  container.innerHTML = _PERDAY_LABELS.map((label, i) => {
-    const dayIdx = (i + 1) % 7; // Mon=1…Sat=6, Sun=0
-    const slot = hoursJson ? hoursJson[dayIdx] : null;
-    const closed = !!hoursJson && !slot;
-    return `<div class="fc-perday-row${closed ? ' is-closed' : ''}" data-day-idx="${dayIdx}">
-      <span class="fc-perday-label">${label}</span>
-      <label class="fc-perday-closed-toggle">
-        <input type="checkbox" class="fc-perday-closed-cb"${closed ? ' checked' : ''} onchange="this.closest('.fc-perday-row').classList.toggle('is-closed', this.checked)">
-        Closed
-      </label>
-      <div class="fc-hours-row fc-perday-hours-row">
-        <input type="time" class="form-input fc-hours-time perday-open" value="${slot?.open || '09:00'}">
-        <span class="fc-hours-sep">to</span>
-        <input type="time" class="form-input fc-hours-time perday-close" value="${slot?.close || '17:00'}">
-      </div>
-    </div>`;
-  }).join('');
+// "Open 24h" is stored as open==="00:00" && close==="00:00" — combined
+// with the overnight rule in getOpenStatus() (close <= open means "still
+// open from yesterday"), that reads as open continuously.
+function _isHoursBlock24h(slot) {
+  return !!slot && slot.open === '00:00' && slot.close === '00:00';
 }
 
-// Reads the rendered day rows back into an opening_hours_json — null for
-// any day whose "Closed" box is ticked. Returns null if nothing is open.
-function buildPerDayHoursJson(container) {
+// Builds one block's markup. `days` is an array of day indices (0-6)
+// already toggled on for this block.
+function _hoursBlockHTML(days, open, close, is24h) {
+  const blockId = ++_hoursBlockSeq;
+  const openId  = `editLPHoursBlockOpen${blockId}`;
+  const closeId = `editLPHoursBlockClose${blockId}`;
+  return `<div class="fc-hours-block${is24h ? ' is-24h' : ''}" data-block-id="${blockId}">
+    <button type="button" class="fc-hb-remove" onclick="removeHoursBlock(this)" aria-label="Remove this hours block"><i class="material-symbols-outlined">close</i></button>
+    <div class="fc-hb-days">${_HOURS_BLOCK_DAY_ORDER.map((dayIdx, i) => `
+      <button type="button" class="fc-hb-day-circle${days.includes(dayIdx) ? ' active' : ''}" data-day="${dayIdx}" onclick="this.classList.toggle('active')">${_HOURS_BLOCK_DAY_LABELS[i]}</button>`).join('')}
+    </div>
+    <div class="fc-hb-row">
+      <span class="fc-hb-row-label">Open 24h</span>
+      <label class="fc-hb-switch">
+        <input type="checkbox" class="fc-hb-24h-cb"${is24h ? ' checked' : ''} onchange="this.closest('.fc-hours-block').classList.toggle('is-24h', this.checked)">
+        <span class="fc-hb-switch-track"><span class="fc-hb-switch-thumb"></span></span>
+      </label>
+    </div>
+    <div class="fc-hb-row fc-hb-time-row">
+      <span class="fc-hb-row-label">Hours</span>
+      <div class="fc-hb-time-pair">
+        <select class="fc-hb-time-pill hb-open" id="${openId}">${buildTimeOptionsHTML(open || '09:00')}</select>
+        <span class="fc-hb-dash">–</span>
+        <select class="fc-hb-time-pill hb-close" id="${closeId}">${buildTimeOptionsHTML(close || '17:00')}</select>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Renders `container`'s hours blocks from an existing opening_hours_json —
+// days sharing an identical open/close (or both "Open 24h") are grouped
+// into the same block. Falls back to one empty block (no days selected,
+// default 9–5) when there's no existing data, so there's always
+// something to edit.
+function renderHoursBlocks(container, hoursJson) {
+  if (!container) return;
+  const groups = [];
+  _HOURS_BLOCK_DAY_ORDER.forEach(dayIdx => {
+    const slot = hoursJson ? hoursJson[dayIdx] : null;
+    if (!slot) return; // no slot = closed that day, not part of any block
+    const is24h = _isHoursBlock24h(slot);
+    const sig = is24h ? '24h' : `${slot.open}-${slot.close}`;
+    let group = groups.find(g => g.sig === sig);
+    if (!group) { group = { sig, days: [], is24h, open: slot.open, close: slot.close }; groups.push(group); }
+    group.days.push(dayIdx);
+  });
+  if (!groups.length) groups.push({ days: [], is24h: false, open: '09:00', close: '17:00' });
+  container.innerHTML = groups.map(g => _hoursBlockHTML(g.days, g.open, g.close, g.is24h)).join('');
+}
+
+// Appends one new, empty block (no days selected yet) — wired to the
+// "+ Add hours" button.
+function addHoursBlock(container) {
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', _hoursBlockHTML([], '09:00', '17:00', false));
+}
+
+// Removes a single block. Always leaves at least one block behind so
+// there's never nothing to edit.
+function removeHoursBlock(btn) {
+  const container = btn.closest('.fc-hours-blocks');
+  const block = btn.closest('.fc-hours-block');
+  if (!container || !block) return;
+  if (container.querySelectorAll('.fc-hours-block').length <= 1) {
+    // Last block left — reset it to empty instead of removing it.
+    block.querySelectorAll('.fc-hb-day-circle.active').forEach(b => b.classList.remove('active'));
+    block.querySelector('.fc-hb-24h-cb').checked = false;
+    block.classList.remove('is-24h');
+    return;
+  }
+  block.remove();
+}
+
+// Reads all blocks in `container` back into an opening_hours_json. Blocks
+// are read top-to-bottom, so a day toggled on in more than one block ends
+// up with whichever block is lower in the list. Returns null if no day is
+// on in any block.
+function buildHoursJsonFromBlocks(container) {
   if (!container) return null;
   const json = {};
   let anyOpen = false;
-  container.querySelectorAll('.fc-perday-row').forEach(row => {
-    const dayIdx = parseInt(row.dataset.dayIdx, 10);
-    if (row.querySelector('.fc-perday-closed-cb')?.checked) { json[dayIdx] = null; return; }
-    const open  = row.querySelector('.perday-open')?.value;
-    const close = row.querySelector('.perday-close')?.value;
-    if (open && close) { json[dayIdx] = { open, close }; anyOpen = true; }
+  container.querySelectorAll('.fc-hours-block').forEach(block => {
+    const is24h = block.classList.contains('is-24h');
+    const open  = is24h ? '00:00' : block.querySelector('.hb-open')?.value;
+    const close = is24h ? '00:00' : block.querySelector('.hb-close')?.value;
+    block.querySelectorAll('.fc-hb-day-circle.active').forEach(btn => {
+      const dayIdx = parseInt(btn.dataset.day, 10);
+      if (open && close) { json[dayIdx] = { open, close }; anyOpen = true; }
+    });
   });
   return anyOpen ? json : null;
-}
-
-// True when an existing opening_hours_json is exactly the uniform-week
-// shape (all 7 days present, all identical) — used to decide which mode
-// the edit sheet should default to. Missing data also counts as "uniform"
-// since there's nothing custom to show.
-function isUniformHoursJson(hoursJson) {
-  if (!hoursJson) return true;
-  const days = Object.values(hoursJson);
-  if (days.length < 7 || !days.every(Boolean)) return false;
-  const first = days[0];
-  return days.every(s => s.open === first.open && s.close === first.close);
 }
 
 // ── EDIT-FORM CAROUSEL ──

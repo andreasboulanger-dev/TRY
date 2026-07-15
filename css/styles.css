@@ -4226,89 +4226,189 @@ input#priceRangeInput::-moz-range-thumb {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Edit Local Price modal — text fields (name, items, discount value,
-   discount description, address search) share the same 28px corner
-   radius as the menu-row cards above. */
-#editLocalPriceModal input.form-input,
-#editLocalPriceModal .form-textarea,
-#editLocalPriceModal .picker-search-input {
-  border-radius: 28px;
+/* Pill-shaped text inputs on every step of the Local Price / Deal edit
+   carousels (scoped to .fc-slide so it doesn't affect inputs elsewhere,
+   e.g. the main "Add to the hive" form). */
+.fc-slide input.form-input {
+  border-radius: var(--md-sys-shape-corner-full);
 }
-#editLocalPriceModal input.form-input:focus,
-#editLocalPriceModal .form-textarea:focus {
-  border-radius: 28px;
-}
-#editLocalPriceModal .picker-search-input:focus {
-  border-radius: 28px;
+.fc-slide input.form-input:focus {
+  border-radius: var(--md-sys-shape-corner-full);
 }
 
-/* Business name field — same rounded shape as other fields, but no
-   filled background. */
-#editLPName {
+/* Business name field — no outline/border, 12px vertical padding. */
+#editLPName,
+#editLPName:focus {
+  border: none;
+  box-shadow: none;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* ── HOURS BLOCKS (Local Price / Deal edit sheet, Hours slide) ──
+   One or more blocks, each: a row of day circles (tap to toggle that
+   day into/out of this block), an "Open 24h" switch, and — while not
+   24h — an open→close time-range pill pair. */
+.fc-hours-blocks { display: flex; flex-direction: column; gap: 14px; }
+
+.fc-hours-block {
+  position: relative;
+  padding-top: 4px;
+}
+.fc-hours-block:not(:last-child) {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.fc-hb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
   background: transparent;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-hb-remove i { font-size: 17px; }
+
+.fc-hb-days {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-right: 26px; /* clears the remove (×) button */
+}
+.fc-hb-day-circle {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--md-sys-color-surface-variant, #E4E4E0);
+  color: var(--text-mid);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s;
+}
+.fc-hb-day-circle.active {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary, #FFFFFF);
 }
 
-/* Opening/closing time dropdown row — slide 1 of both edit sheets. */
-.fc-hours-row {
+.fc-hb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.fc-hb-row-label {
+  font-size: 14.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.fc-hours-block.is-24h .fc-hb-time-row { display: none; }
+
+/* Open-24h switch — small custom checkbox toggle (iOS-style track/thumb). */
+.fc-hb-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  display: inline-block;
+}
+.fc-hb-switch .fc-hb-24h-cb {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.fc-hb-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-variant, #E4E4E0);
+  transition: background-color 0.15s;
+}
+.fc-hb-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: var(--md-sys-elevation-shadow-1);
+  transition: transform 0.15s;
+}
+.fc-hb-24h-cb:checked ~ .fc-hb-switch-track {
+  background: var(--md-sys-color-primary);
+}
+.fc-hb-24h-cb:checked ~ .fc-hb-switch-track .fc-hb-switch-thumb {
+  transform: translateX(20px);
+}
+
+.fc-hb-time-pair {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
-.fc-hours-select {
-  flex: 1;
-  min-width: 0;
+.fc-hb-time-pill {
+  flex: 0 0 auto;
+  width: auto;
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23767872' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 16px;
-  padding-right: 38px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--md-sys-color-surface-variant, #E4E4E0);
+  color: var(--md-sys-color-on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 10px 14px;
   cursor: pointer;
 }
-
-/* Writable time field for the per-day hours rows — a plain typable input
-   (native time picker), not a dropdown list like .fc-hours-select above. */
-.fc-hours-time {
-  flex: 1;
-  min-width: 0;
-}
-
-.fc-hours-sep {
+.fc-hb-dash {
   flex: 0 0 auto;
-  font-size: 13px;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-/* Per-day opening hours rows (Local Price edit sheet — "Different per
-   day" mode). Each row: day label, a "Closed" checkbox, and the same
-   dropdown pair used by the uniform-hours row above. */
-.fc-perday-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.fc-perday-label {
-  flex: 0 0 32px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-mid);
-}
-.fc-perday-closed-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  font-size: 11px;
   color: var(--text-light);
-  cursor: pointer;
-  white-space: nowrap;
 }
-.fc-perday-closed-toggle input { margin: 0; }
-.fc-perday-hours-row { flex: 1; min-width: 0; }
-.fc-perday-row.is-closed .fc-perday-hours-row { visibility: hidden; }
+
+/* "+ Add hours" — own card below the hours-block(s) card, matching the
+   field-card style used elsewhere on this slide. */
+.fc-add-hours-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 12px;
+  border: none;
+  border-radius: 21px;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-primary);
+  font-size: 14.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-add-hours-btn i { font-size: 18px; }
+
+
+.fc-perday-row.is-closed .fc-perday-closed-label { display: block; }
 
 /* Left slot of the nav row — Back arrow (slides 2+) cross-fades with a
    Delete button (slide 1 only), same overlay/grid trick as .fc-btn-slot
@@ -4404,11 +4504,6 @@ input#priceRangeInput::-moz-range-thumb {
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: 14px;
-}
-
-/* Edit Local Price modal: menu-row cards get a more rounded corner. */
-#editLocalPriceModal .fc-menu-group {
-  border-radius: 28px;
 }
 
 .fc-menu-row {
@@ -4524,6 +4619,63 @@ input#priceRangeInput::-moz-range-thumb {
   opacity:0.45;
   cursor:not-allowed;
   pointer-events:none;
+}
+
+/* Category picker on the Edit Local Price modal's Categories slide —
+   a single-column list of rows (not the icon-grid cards used by the
+   main "Add to the hive" form), each with a checkmark indicator on the
+   left: an empty grey ring, filled blue with a white check when
+   selected. Lives inside a .fc-menu-group card for the shared divider
+   lines and rounded corners. */
+.type-option-list {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.type-option-list:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+.type-option-list span:not(.type-option-check) {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface);
+}
+.type-option-list.selected {
+  border-color: transparent;
+  background: transparent;
+}
+.type-option-list.selected span:not(.type-option-check) {
+  color: var(--md-sys-color-on-surface);
+}
+
+.type-option-check {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.type-option-check i {
+  font-size: 16px;
+  color: transparent;
+  transition: color 0.15s;
+}
+.type-option-list.selected .type-option-check {
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+.type-option-list.selected .type-option-check i {
+  color: #FFFFFF;
 }
 
 .location-map-wrap {

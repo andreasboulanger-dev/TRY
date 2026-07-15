@@ -516,7 +516,6 @@
                   <i class="material-symbols-outlined fc-menu-chevron">chevron_right</i>
                 </button>
               </div>
-
             </div>
 
             <!-- Slide 1: Name -->
@@ -549,29 +548,21 @@
             <!-- Slide 3: Hours -->
             <div class="fc-slide">
               <div class="fc-field-card">
-                <div class="ld-type-row" id="editLPHoursModeRow">
-                  <button type="button" class="ld-type-btn active" id="editLPHoursModeSame" onclick="setEditLPHoursMode('same')">Same every day</button>
-                  <button type="button" class="ld-type-btn" id="editLPHoursModeCustom" onclick="setEditLPHoursMode('custom')">Different per day</button>
-                </div>
-                <div class="fc-hours-row" id="editLPUniformHours">
-                  <select class="form-input fc-hours-select" id="editLPOpenTime"></select>
-                  <span class="fc-hours-sep">to</span>
-                  <select class="form-input fc-hours-select" id="editLPCloseTime"></select>
-                </div>
-                <div id="editLPPerDayHours" style="display:none;"></div>
+                <div class="fc-hours-blocks" id="editLPHoursBlocks"></div>
               </div>
+              <button type="button" class="fc-add-hours-btn" onclick="addHoursBlock(document.getElementById('editLPHoursBlocks'))">
+                <i class="material-symbols-outlined">add</i> Add hours
+              </button>
             </div>
 
             <!-- Slide 4: Categories -->
             <div class="fc-slide">
-              <div class="form-group">
-                <div class="type-grid">
-                  <button class="type-option" data-lpcat="bar" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sports_bar</i><span>Bar</span></button>
-                  <button class="type-option" data-lpcat="coffee shop" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">local_cafe</i><span>Café</span></button>
-                  <button class="type-option" data-lpcat="deal" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">sell</i><span>Deal</span></button>
-                  <button class="type-option" data-lpcat="activity" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">directions_run</i><span>Activities</span></button>
-                  <button class="type-option" data-lpcat="hostel" onclick="selectEditLPCat(this)"><i class="material-symbols-outlined">bed</i><span>Hostel</span></button>
-                </div>
+              <div class="fc-menu-group">
+                <button class="type-option type-option-list" data-lpcat="bar" onclick="selectEditLPCat(this)"><span class="type-option-check"><i class="material-symbols-outlined">check</i></span><span>Bar</span></button>
+                <button class="type-option type-option-list" data-lpcat="coffee shop" onclick="selectEditLPCat(this)"><span class="type-option-check"><i class="material-symbols-outlined">check</i></span><span>Café</span></button>
+                <button class="type-option type-option-list" data-lpcat="deal" onclick="selectEditLPCat(this)"><span class="type-option-check"><i class="material-symbols-outlined">check</i></span><span>Deal</span></button>
+                <button class="type-option type-option-list" data-lpcat="activity" onclick="selectEditLPCat(this)"><span class="type-option-check"><i class="material-symbols-outlined">check</i></span><span>Activities</span></button>
+                <button class="type-option type-option-list" data-lpcat="hostel" onclick="selectEditLPCat(this)"><span class="type-option-check"><i class="material-symbols-outlined">check</i></span><span>Hostel</span></button>
               </div>
             </div>
 
