@@ -597,6 +597,15 @@ html,body {
      .page (not on .pages) so it applies to this box's own content — no
      dependency on how an ancestor's padding interacts with inset:0. */
   padding-top: var(--header-float-offset);
+  /* Content must also stop short of the floating nav bar at the bottom —
+     without this, .page's own scrollable area (overflow-y:auto, inset:0)
+     runs all the way to #app's true bottom edge, so the last row of
+     content (and the nav pill itself, since it's a sibling absolutely
+     positioned over .pages) visually overlaps whatever's still scrolled
+     into view there. --nav-float-offset already bakes in the gap, the
+     nav's own height, and the safe-area inset, so reusing it here keeps
+     this in sync with the nav's actual position automatically. */
+  padding-bottom: var(--nav-float-offset);
   box-sizing: border-box;
 }
 
